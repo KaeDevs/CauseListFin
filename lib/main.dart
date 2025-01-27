@@ -128,6 +128,8 @@ class CenterPage extends StatefulWidget {
 enum menuitems { about, exit }
 
 class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
+  InterstitialAd? _interstitialAd;
+  bool _isInterstitialAdReady = false;
   bool isChecked1 = false;
   bool isChecked2 = false;
   DateTime? selectedDate;
@@ -187,25 +189,31 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    final DateTime? pickedDate = await showDatePicker(
-      context: context,
-      initialDate: selectedDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
-      builder: (BuildContext context, Widget? child) {
-        return Theme(
-          data: ThemeData.light().copyWith(
-            primaryColor: Colors.deepPurple,
-            hintColor: Colors.deepPurple,
-            colorScheme: const ColorScheme.light(primary: Colors.deepPurple),
-            buttonTheme: const ButtonThemeData(
-              textTheme: ButtonTextTheme.primary,
+  final DateTime? pickedDate = await showDatePicker(
+    context: context,
+    initialDate: selectedDate ?? DateTime.now(),
+    firstDate: DateTime(2024, 12, 1),
+    lastDate: DateTime(2025, 1, 31),
+    builder: (BuildContext context, Widget? child) {
+      return Theme(
+        data: ThemeData.dark().copyWith(
+          primaryColor: Colors.black,
+          hintColor: const Color.fromARGB(88, 212, 211, 211),
+          colorScheme: const ColorScheme.light(primary: Colors.black),
+          buttonTheme: const ButtonThemeData(
+            textTheme: ButtonTextTheme.accent,
+          ),
+          dialogTheme: const DialogTheme(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.zero, 
             ),
           ),
-          child: child!,
-        );
-      },
-    );
+        ),
+        child: child!,
+      );
+    },
+  );
+
 
     if (pickedDate != null && pickedDate != selectedDate) {
       setState(() {
@@ -443,8 +451,7 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
                                                         Alignment.centerLeft,
                                                     child: TextFormField(
                                                       controller: _controller,
-                                                      onFieldSubmitted:
-                                                          (String value) {
+                                                      onChanged: (String value) {
                                                         final appstate =
                                                             Provider.of<
                                                                     AppState>(
@@ -452,7 +459,8 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
                                                                 listen: false);
                                                         appstate.changeAdvName(
                                                             value);
-                                                      },
+                                                      } ,
+                                                      
                                                       decoration:
                                                           const InputDecoration(
                                                         hintText:
@@ -685,6 +693,7 @@ class _RefreshableBannerAdWidgetState extends State<RefreshableBannerAdWidget> {
 
   void _startAdRefreshTimer() {
     _adRefreshTimer = Timer.periodic(Duration(minutes: 1), (timer) {
+      Fluttertoast.showToast(msg: "Ad Refreshing");
       _loadBannerAd();
     });
   }
@@ -693,7 +702,7 @@ class _RefreshableBannerAdWidgetState extends State<RefreshableBannerAdWidget> {
     _bannerAd = BannerAd(
       adUnitId: 'ca-app-pub-3940256099942544/9214589741',
       size: AdSize.banner,
-      request: AdRequest(),
+      request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (_) {
           setState(() {

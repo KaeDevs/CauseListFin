@@ -13,7 +13,8 @@ import 'package:intl/intl.dart';
 
 Future<List<dynamic>> fetchCasesAllAdv(BuildContext context, {int page = 1, int limit = 20}) async {
   final selectedCourt = Provider.of<AppState>(context, listen: false).selected_court;
-  String link = "https://causelistapi.onrender.com/";
+  // String oldlink = "https://causelistapi.onrender.com/";
+  String link = "https://cause-api.vercel.app/";
   String link2 = "http://192.168.1.3:3000";
   String dist = "";
   if(selectedCourt == 0){
@@ -25,6 +26,7 @@ Future<List<dynamic>> fetchCasesAllAdv(BuildContext context, {int page = 1, int 
 
   final response = await http.get(Uri.parse('https://causelistapi.onrender.com/data/$dist?page=$page&limit=$limit'));
 
+  print('https://causelistapi.onrender.com/data/$dist?page=$page&limit=$limit');
   if (response.statusCode == 200) {
     print(jsonDecode(response.body));
     final jsonResponse = jsonDecode(response.body);
