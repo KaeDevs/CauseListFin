@@ -53,33 +53,6 @@ class _ListPageState extends State<ListPage> {
     });
   }
 
-  Future<void> _fetchCourtsOnce() async {
-    print("Hoelloo");
-    setState(() {
-      isLoadingCourts = true;
-    });
-
-    try {
-      Map<String, List<dynamic>> newCourts =
-          await fetchCourts(context); // Get the formatted courts map
-      setState(() {
-        courtswithjustice = newCourts; // Store the courts data
-      });
-      // Using null-aware operators
-
-      print(
-          "${courtswithjustice["COURT NO. 01"]?.first['timing'] ?? 'No Timing Info'}");
-      print(
-          "${courtswithjustice["COURT NO. 01"]?.first['justices'] ?? 'No Justices Info'}");
-    } catch (error) {
-      print('Error fetching courts in side future: $error');
-    } finally {
-      setState(() {
-        isLoadingCourts = false;
-      });
-    }
-  }
-
   Future<void> _fetchPaginatedCases(bool advPresent) async {
     if (hasMore && !isLoading) {
       setState(() {
@@ -92,30 +65,61 @@ class _ListPageState extends State<ListPage> {
             : await fetchCasesAdvPresent(context,
                 page: currentPage, limit: limit);
 
-        setState(() {
-          if (newCases.isNotEmpty) {
-            // Add only new cases to avoid duplicates
-            final caseSet = cases.map((c) => c['case_number']).toSet();
-            newCases = newCases
-                .where((c) => !caseSet.contains(c['case_number']))
-                .toList();
-
+        if (mounted) {
+          setState(() {
             if (newCases.isNotEmpty) {
-              cases.addAll(newCases);
-              currentPage++; // Increment the page for the next fetch
+              final caseSet = cases.map((c) => c['case_number']).toSet();
+              newCases = newCases
+                  .where((c) => !caseSet.contains(c['case_number']))
+                  .toList();
+
+              if (newCases.isNotEmpty) {
+                cases.addAll(newCases);
+                currentPage++;
+              } else {
+                hasMore = false;
+              }
             } else {
-              // If no new cases are added, mark hasMore as false to stop further fetching
               hasMore = false;
             }
-          } else {
-            hasMore = false; // No more data available
-          }
-        });
+          });
+        }
       } catch (error) {
-        print('Error fetching cases: $error');
+        if (mounted) {
+          setState(() {
+            print('Error fetching cases: $error');
+          });
+        }
       } finally {
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+          });
+        }
+      }
+    }
+  }
+
+  Future<void> _fetchCourtsOnce() async {
+    print("Hoelloo");
+    setState(() {
+      isLoadingCourts = true;
+    });
+
+    try {
+      Map<String, List<dynamic>> newCourts =
+          await fetchCourts(context); // Get the formatted courts map
+      if (mounted) {
         setState(() {
-          isLoading = false;
+          courtswithjustice = newCourts; // Store the courts data
+        });
+      }
+    } catch (error) {
+      print('Error fetching courts in side future: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoadingCourts = false;
         });
       }
     }
@@ -169,34 +173,42 @@ class _ListPageState extends State<ListPage> {
             child: courts.isEmpty
                 ? !isLoading
                     ? Center(
-                      child: Column(
-                        children: [
-                          Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 20, 20, 50),
+                        child: Column(
+                          children: [
+                            Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(20, 20, 20, 50),
                               child: Center(
-                                  child: Text(
-                                'No cases found for advocate: ${AppState().advName}',
-                                style: Tools.H2.copyWith(fontSize: 15),
-                              )),
+                                  
+                                  child: AppState().advName == null
+                                      ? Text(
+                                          'No cases found for advocate: ${AppState().advName}',
+                                          style:
+                                              Tools.H2.copyWith(fontSize: 15),
+                                        )
+                                      : Text(
+                                          'No cases found for the given Details ${AppState().advName}',
+                                          style:
+                                              Tools.H2.copyWith(fontSize: 15),
+                                        )),
                             ),
-                            
-                        ],
-                      ),
-                    )
-                    : SafeArea(
+                          ],
+                        ),
+                      )
+                    : const SafeArea(
                         child: Column(
                           children: [
                             Expanded(
                               child: Center(
                                 child: Column(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.center, // Center vertically
+                                  mainAxisAlignment: MainAxisAlignment
+                                      .center, // Center vertically
                                   children: [
                                     CircularProgressIndicator(),
-                                    const SizedBox(
+                                    SizedBox(
                                         height:
                                             20), // Add space between the two widgets
-                                    RefreshableBannerAdWidget(),
+                                    // RefreshableBannerAdWidget(),
                                   ],
                                 ),
                               ),
@@ -212,15 +224,17 @@ class _ListPageState extends State<ListPage> {
                               _scrollController, // Attach the scroll controller for pagination
                           itemCount: courts.keys.length,
                           itemBuilder: (context, courtIndex) {
-                            String courtNumber = courts.keys.elementAt(courtIndex);
+                            String courtNumber =
+                                courts.keys.elementAt(courtIndex);
                             Map<String, List<dynamic>> categories =
                                 courts[courtNumber]!;
-            
+
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 Container(
-                                  color: const Color.fromARGB(255, 193, 222, 215),
+                                  color:
+                                      const Color.fromARGB(255, 193, 222, 215),
                                   child: Padding(
                                     padding: const EdgeInsets.all(8.0),
                                     child: Column(
@@ -242,7 +256,8 @@ class _ListPageState extends State<ListPage> {
                                         ),
                                         Text(
                                           '${courtswithjustice[courtNumber]?.first['timing'] ?? 'No timing Info'}',
-                                          style: Tools.H3.copyWith(fontSize: 12),
+                                          style:
+                                              Tools.H3.copyWith(fontSize: 12),
                                           textAlign: TextAlign.center,
                                         ),
                                       ],
@@ -252,7 +267,8 @@ class _ListPageState extends State<ListPage> {
                                 // Iterate over the categories in this court
                                 for (var category in categories.keys)
                                   Column(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Padding(
                                         padding: const EdgeInsets.all(4.0),
@@ -270,20 +286,23 @@ class _ListPageState extends State<ListPage> {
                                         child: DataTable(
                                           dataRowMaxHeight: double.infinity,
                                           // headingRowHeight: 0,
-            
+
                                           columnSpacing: 5,
                                           columns: const [
                                             DataColumn(label: Text('S.No')),
                                             DataColumn(label: Text('Case No')),
                                             DataColumn(label: Text('Parties')),
                                             DataColumn(
-                                                label: Text('Petitioner Advocates')),
+                                                label: Text(
+                                                    'Petitioner Advocates')),
                                             DataColumn(
-                                                label: Text('Respondent Advocates')),
+                                                label: Text(
+                                                    'Respondent Advocates')),
                                             // DataColumn(label: Text('Category')),
                                             // DataColumn(label: Text('Justice')),
                                           ],
-                                          rows: _buildDataRows(categories[category]!),
+                                          rows: _buildDataRows(
+                                              categories[category]!),
                                         ),
                                       ),
                                     ],
@@ -307,7 +326,7 @@ class _ListPageState extends State<ListPage> {
             child: Center(
               child: RefreshableBannerAdWidget(),
             ),
-            )
+          )
         ],
       ),
     );

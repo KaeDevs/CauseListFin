@@ -13,20 +13,23 @@ import 'package:intl/intl.dart';
 
 Future<List<dynamic>> fetchCasesAllAdv(BuildContext context, {int page = 1, int limit = 20}) async {
   final selectedCourt = Provider.of<AppState>(context, listen: false).selected_court;
+  final date = Provider.of<AppState>(context, listen: false).mainDate;
   // String oldlink = "https://causelistapi.onrender.com/";
   String link = "https://cause-api.vercel.app/";
   String link2 = "http://192.168.1.3:3000";
   String dist = "";
   if(selectedCourt == 0){
-    dist = "mad";
+    dist = "madr";
   }
   else{
     dist = "mdu";
   }
 
-  final response = await http.get(Uri.parse('https://causelistapi.onrender.com/data/$dist?page=$page&limit=$limit'));
 
-  print('https://causelistapi.onrender.com/data/$dist?page=$page&limit=$limit');
+
+  final response = await http.get(Uri.parse('https://causelistapi.onrender.com/data/$dist?date=$date&page=$page&limit=$limit'));
+
+  print('https://causelistapi.onrender.com/data/$dist?date=$date&page=$page&limit=$limit');
   if (response.statusCode == 200) {
     print(jsonDecode(response.body));
     final jsonResponse = jsonDecode(response.body);
@@ -38,10 +41,11 @@ Future<List<dynamic>> fetchCasesAllAdv(BuildContext context, {int page = 1, int 
 }
 Future<List<dynamic>> fetchCasesAdvPresent(BuildContext context, {int page = 1, int limit = 20}) async {
   final advName = AppState().advName;
+  final date = Provider.of<AppState>(context, listen: false).mainDate;
   final selectedCourt = Provider.of<AppState>(context, listen: false).selected_court;
-  String dist = selectedCourt == 0 ? "mad" : "mdu";
+  String dist = selectedCourt == 0 ? "madr" : "mdu";
   
-  final response = await http.get(Uri.parse('https://causelistapi.onrender.com/data/$advName/$dist'));
+  final response = await http.get(Uri.parse('https://causelistapi.onrender.com/dataoa/$advName/$dist?date=$date'));
 
   if (response.statusCode == 200) {
     final jsonResponse = jsonDecode(response.body);
@@ -59,14 +63,15 @@ Future<List<dynamic>> fetchCasesAdvPresent(BuildContext context, {int page = 1, 
 }
 Future<Map<String, List<dynamic>>> fetchCourts(BuildContext context, ) async {
   final selectedCourt = Provider.of<AppState>(context, listen: false).selected_court;
+  final date = Provider.of<AppState>(context, listen: false).mainDate;
   String dist = "";
   if(selectedCourt == 0){
-    dist = "mad";
+    dist = "madr";
   }
   else{
     dist = "mdu";
   }
-  final response = await http.get(Uri.parse('https://causelistapi.onrender.com/courts/$dist'));
+  final response = await http.get(Uri.parse('https://causelistapi.onrender.com/courts/$dist?date=$date'));
 
   if (response.statusCode == 200) {
     print("Courts Fetching");

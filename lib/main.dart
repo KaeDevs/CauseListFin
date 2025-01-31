@@ -1,5 +1,6 @@
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'dart:async';
+import 'package:share_plus/share_plus.dart';
 import 'package:fincauselist/ApiStuff.dart';
 import 'package:fincauselist/listpage.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -25,6 +26,7 @@ class AppState extends ChangeNotifier {
   AppState._internal();
   static const court = ["Madras", "Madurai"];
 
+  String mainDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
   // String adv_name = "";
 
   int selected_court = 0;
@@ -40,6 +42,11 @@ class AppState extends ChangeNotifier {
   void selected(int initial) {
     selected_court = initial;
 
+    notifyListeners();
+  }
+
+  void updateMainDate(DateTime pickedDate) {
+    mainDate = DateFormat('yyyy-MM-dd').format(pickedDate); // Format pickedDate as string
     notifyListeners();
   }
 
@@ -125,7 +132,7 @@ class CenterPage extends StatefulWidget {
   State<StatefulWidget> createState() => _CenterPage();
 }
 
-enum menuitems { about, exit }
+enum menuitems { about, share, exit }
 
 class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
   InterstitialAd? _interstitialAd;
@@ -217,6 +224,8 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
 
     if (pickedDate != null && pickedDate != selectedDate) {
       setState(() {
+        Provider.of<AppState>(context, listen: false).updateMainDate(pickedDate);
+        
         selectedDate = pickedDate;
         isdateactive = true;
       });
@@ -274,6 +283,10 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
                                     child: Text("About"),
                                   ),
                                   const PopupMenuItem(
+                                    value: menuitems.share,
+                                    child: Text("Share"),
+                                  ),
+                                  const PopupMenuItem(
                                     value: menuitems.exit,
                                     child: Text("Exit"),
                                   ),
@@ -285,6 +298,9 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
                                           MaterialPageRoute(
                                               builder: (context) =>
                                                   const AboutPage()));
+                                      break;
+                                    case menuitems.share:
+                                    Share.share("Checkout this app! https://play.google.com/store/apps/details?id=mhc.file.mhcdb&hl=en_IN", subject: "Look what I found!");
                                       break;
                                     case menuitems.exit:
                                       SystemNavigator.pop();
@@ -485,6 +501,7 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
                                                 ),
                                               ],
                                             ),
+                                            
                                           ],
                                         ),
                                       )
@@ -693,7 +710,7 @@ class _RefreshableBannerAdWidgetState extends State<RefreshableBannerAdWidget> {
 
   void _startAdRefreshTimer() {
     _adRefreshTimer = Timer.periodic(Duration(minutes: 1), (timer) {
-      Fluttertoast.showToast(msg: "Ad Refreshing");
+      // Fluttertoast.showToast(msg: "Ad Refreshing");
       _loadBannerAd();
     });
   }
