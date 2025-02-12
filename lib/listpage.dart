@@ -180,7 +180,7 @@ class _ListPageState extends State<ListPage> {
                                   const EdgeInsets.fromLTRB(20, 20, 20, 50),
                               child: Center(
                                   
-                                  child: AppState().advName == null
+                                  child: AppState().advName.isNotEmpty
                                       ? Text(
                                           'No cases found for advocate: ${AppState().advName}',
                                           style:
@@ -273,7 +273,7 @@ class _ListPageState extends State<ListPage> {
                                       Padding(
                                         padding: const EdgeInsets.all(4.0),
                                         child: Text(
-                                          '$category',
+                                          category,
                                           style: Tools.H3.copyWith(
                                               color: const Color.fromARGB(
                                                   255, 182, 8, 8)),

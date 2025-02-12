@@ -55,7 +55,7 @@ Future<List<dynamic>> fetchCasesAdvPresent(BuildContext context, {int page = 1, 
     final jsonResponse = jsonDecode(response.body);
     String errorMessage = jsonResponse['message'] ?? 'No cases found for advocate: $advName';
     
-    Fluttertoast.showToast(msg: errorMessage); // Display error message
+    // Fluttertoast.showToast(msg: errorMessage); // Display error message
     return []; // Return an empty list to indicate no cases found
   } else {
     throw Exception('Failed to load cases');

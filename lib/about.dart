@@ -1,3 +1,4 @@
+import 'package:fincauselist/main.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -16,7 +17,7 @@ class _aboutPage extends State<AboutPage> {
       appBar: AppBar(
         title: const Text(
           "About Page🧾",
-          style: TextStyle(fontFamily: "heading"),
+          style: Tools.H2,
         ),
       ),
       body: Column(
@@ -27,16 +28,16 @@ class _aboutPage extends State<AboutPage> {
           Center(
               child: Column(
             children: [
-              const Text(
+              Text(
                 "Developed By:",
-                style: TextStyle(fontFamily: "heading", color: Colors.white),
+                style: Tools.H2.copyWith(fontFamily: "heading", color: Colors.white),
               ),
               const SizedBox(
                 height: 15,
               ),
-              const Text(
+              Text(
                 "KAVIN M",
-                style: TextStyle(
+                style: Tools.H2.copyWith(
                     fontFamily: "heading", color: Colors.white, fontSize: 30),
               ),
               const SizedBox(

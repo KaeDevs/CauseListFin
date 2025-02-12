@@ -1,7 +1,8 @@
+import 'package:fincauselist/dependency_injection.dart';
+import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'dart:async';
 import 'package:share_plus/share_plus.dart';
-import 'package:fincauselist/ApiStuff.dart';
 import 'package:fincauselist/listpage.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:fincauselist/about.dart';
@@ -15,6 +16,7 @@ void main() {
   MobileAds.instance.initialize();
   runApp(ChangeNotifierProvider(
       create: (context) => AppState(), child: const MyApp()));
+  DependencyInjection.init();
 }
 
 class AppState extends ChangeNotifier {
@@ -46,7 +48,8 @@ class AppState extends ChangeNotifier {
   }
 
   void updateMainDate(DateTime pickedDate) {
-    mainDate = DateFormat('yyyy-MM-dd').format(pickedDate); // Format pickedDate as string
+    mainDate = DateFormat('yyyy-MM-dd')
+        .format(pickedDate); // Format pickedDate as string
     notifyListeners();
   }
 
@@ -105,7 +108,8 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return GetMaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Flutter Demo',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
@@ -196,50 +200,89 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
   }
 
   Future<void> _selectDate(BuildContext context) async {
-  final DateTime? pickedDate = await showDatePicker(
-    context: context,
-    initialDate: selectedDate ?? DateTime.now(),
-    firstDate: DateTime(2024, 12, 1),
-    lastDate: DateTime(2025, 1, 31),
-    builder: (BuildContext context, Widget? child) {
-      return Theme(
-        data: ThemeData.dark().copyWith(
-          primaryColor: Colors.black,
-          hintColor: const Color.fromARGB(88, 212, 211, 211),
-          colorScheme: const ColorScheme.light(primary: Colors.black),
-          buttonTheme: const ButtonThemeData(
-            textTheme: ButtonTextTheme.accent,
-          ),
-          dialogTheme: const DialogTheme(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.zero, 
+  List<int> daysOfWeek = [7, 6]; // Prevent weekends
+
+  DateTime initialDate = selectedDate ?? DateTime.now();
+  while (daysOfWeek.contains(initialDate.weekday)) {
+    initialDate = initialDate.add(Duration(days: 1));
+  }
+
+  Future.delayed(Duration.zero, () {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: "Date Picker",
+      transitionDuration: Duration(milliseconds: 250), // Smooth animation
+      pageBuilder: (context, anim1, anim2) {
+        return FadeTransition(
+          opacity: anim1,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(anim1),
+            child: Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Container(
+                padding: EdgeInsets.all(10),
+                child: _buildDatePicker(context, initialDate, daysOfWeek),
+              ),
             ),
           ),
-        ),
-        child: child!,
-      );
-    },
+        );
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        return FadeTransition(
+          opacity: anim1,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.9, end: 1.0).animate(anim1),
+            child: child,
+          ),
+        );
+      },
+    );
+  });
+}
+
+// Separate function to create a date picker widget
+Widget _buildDatePicker(BuildContext context, DateTime initialDate, List<int> daysOfWeek) {
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      CalendarDatePicker(
+        initialDate: initialDate,
+        firstDate: DateTime(2025, 1, 27),
+        lastDate: DateTime(2025, 2, 31),
+        selectableDayPredicate: (DateTime dateTime) =>
+            !daysOfWeek.contains(dateTime.weekday),
+        onDateChanged: (pickedDate) {
+          Navigator.of(context).pop(); // Close dialog when a date is selected
+          if (pickedDate != selectedDate) {
+            Provider.of<AppState>(context, listen: false).updateMainDate(pickedDate);
+            selectedDate = pickedDate;
+            isdateactive = true;
+            setState(() {}); // Refresh UI
+          }
+        },
+      ),
+    ],
   );
+}
 
 
-    if (pickedDate != null && pickedDate != selectedDate) {
-      setState(() {
-        Provider.of<AppState>(context, listen: false).updateMainDate(pickedDate);
-        
-        selectedDate = pickedDate;
-        isdateactive = true;
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppState>(context);
+    // final appState = Provider.of<AppState>(context);
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor:
+          const Color.fromARGB(255, 0, 0, 0), // Change status bar background
+      statusBarIconBrightness: Brightness.light, // Light text/icons
+    ));
 
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: Stack(
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Stack(
           children: [
             Opacity(
               opacity: 0.3,
@@ -276,7 +319,9 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
                               ),
                               PopupMenuButton<menuitems>(
                                 surfaceTintColor: Colors.white,
+                                popUpAnimationStyle: AnimationStyle(curve: Curves.easeInOut, duration: Duration(milliseconds: 300)),
                                 icon: const Icon(Icons.settings),
+                                color: Colors.white,
                                 itemBuilder: (BuildContext context) => [
                                   const PopupMenuItem(
                                     value: menuitems.about,
@@ -300,7 +345,9 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
                                                   const AboutPage()));
                                       break;
                                     case menuitems.share:
-                                    Share.share("Checkout this app! https://play.google.com/store/apps/details?id=mhc.file.mhcdb&hl=en_IN", subject: "Look what I found!");
+                                      Share.share(
+                                          "Checkout this app! https://play.google.com/store/apps/details?id=mhc.file.mhcdb&hl=en_IN",
+                                          subject: "Look what I found!");
                                       break;
                                     case menuitems.exit:
                                       SystemNavigator.pop();
@@ -467,7 +514,8 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
                                                         Alignment.centerLeft,
                                                     child: TextFormField(
                                                       controller: _controller,
-                                                      onChanged: (String value) {
+                                                      onChanged:
+                                                          (String value) {
                                                         final appstate =
                                                             Provider.of<
                                                                     AppState>(
@@ -475,8 +523,7 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
                                                                 listen: false);
                                                         appstate.changeAdvName(
                                                             value);
-                                                      } ,
-                                                      
+                                                      },
                                                       decoration:
                                                           const InputDecoration(
                                                         hintText:
@@ -501,7 +548,6 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
                                                 ),
                                               ],
                                             ),
-                                            
                                           ],
                                         ),
                                       )
@@ -514,7 +560,7 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                RefreshableBannerAdWidget(), 
+                RefreshableBannerAdWidget(),
               ],
             ),
           ],
@@ -624,63 +670,66 @@ class _AdvSrhState extends State<AdvSrh> {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Card(
-        elevation: 50,
-        shadowColor: Colors.black,
-        child: SizedBox(
-          height: 500,
-          width: 300,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                const Text(
-                  "Select\nAdvocate",
-                  style: Tools.H3,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: _controller,
-                  decoration: InputDecoration(
-                    hintText: 'Search advocate',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _controller.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _controller.clear();
-                              _filterAdvocates('');
-                              final appState =
-                                  Provider.of<AppState>(context, listen: false);
-                              appState.changeAdvName('');
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
+    return SingleChildScrollView(
+      physics: BouncingScrollPhysics(),
+      child: Center(
+        child: Card(
+          elevation: 50,
+          shadowColor: Colors.black,
+          child: SizedBox(
+            height: 500,
+            width: 300,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  const Text(
+                    "Select\nAdvocate",
+                    style: Tools.H3,
+                    textAlign: TextAlign.center,
                   ),
-                  onChanged: (value) {
-                    _filterAdvocates(value);
-                  },
-                ),
-                const SizedBox(height: 20),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: filteredList.length,
-                    itemBuilder: (context, index) {
-                      return ListTile(
-                        title: Text(filteredList[index]),
-                        onTap: () {
-                          _selectAdvocate(filteredList[index]);
-                        },
-                      );
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: _controller,
+                    decoration: InputDecoration(
+                      hintText: 'Search advocate',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _controller.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _controller.clear();
+                                _filterAdvocates('');
+                                final appState = Provider.of<AppState>(context,
+                                    listen: false);
+                                appState.changeAdvName('');
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10.0),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      _filterAdvocates(value);
                     },
                   ),
-                ),
-              ],
+                  const SizedBox(height: 20),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: filteredList.length,
+                      itemBuilder: (context, index) {
+                        return ListTile(
+                          title: Text(filteredList[index]),
+                          onTap: () {
+                            _selectAdvocate(filteredList[index]);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -688,7 +737,6 @@ class _AdvSrhState extends State<AdvSrh> {
     );
   }
 }
-
 
 class RefreshableBannerAdWidget extends StatefulWidget {
   @override
@@ -753,4 +801,3 @@ class _RefreshableBannerAdWidgetState extends State<RefreshableBannerAdWidget> {
         : SizedBox(); // Optionally show a placeholder or loading widget here
   }
 }
-
