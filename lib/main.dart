@@ -1,3 +1,4 @@
+import 'package:fincauselist/Tools/adtools.dart';
 import 'package:fincauselist/dependency_injection.dart';
 import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -11,9 +12,28 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
+import 'Modules/FeedBack/feedback_diaog.dart';
+
+
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   MobileAds.instance.initialize();
+  SystemChrome.setSystemUIOverlayStyle(
+    SystemUiOverlayStyle(
+      // statusBarColor: Colors.blueGrey,
+      // statusBarBrightness: Brightness.dark,
+      // statusBarIconBrightness: Brightness.dark,
+      // systemNavigationBarColor: Colors.blueGrey,
+      // systemNavigationBarIconBrightness: Brightness.dark,
+      // systemNavigationBarDividerColor: Colors.blueGrey,
+      // systemNavigationBarContrastEnforced: false,
+      // systemStatusBarContrastEnforced: false,
+      // systemStatusBarContrastEnforced: false,
+      // systemStatusBarContrastEnforced: false,
+
+    )
+  );
   runApp(ChangeNotifierProvider(
       create: (context) => AppState(), child: const MyApp()));
   DependencyInjection.init();
@@ -54,6 +74,7 @@ class AppState extends ChangeNotifier {
   }
 
   void toggleSelected() {
+    AdManager().showInterstitialAd();
     if (selected_court == 0) {
       selected_court = 1;
     } else {
@@ -114,6 +135,7 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
+        
       ),
       home: Display(),
     );
@@ -136,7 +158,7 @@ class CenterPage extends StatefulWidget {
   State<StatefulWidget> createState() => _CenterPage();
 }
 
-enum menuitems { about, share, exit }
+enum menuitems { about, share, exit, feedBack }
 
 class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
   InterstitialAd? _interstitialAd;
@@ -145,22 +167,39 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
   bool isChecked2 = false;
   DateTime? selectedDate;
 
+  Timer? _adTimer;
+
   bool isbuttonactive = false;
   bool isdateactive = false;
 
   bool firsttimeselect = true;
 
   late TextEditingController _controller;
+@override
+void initState() {
+  super.initState();
 
-  @override
-  void initState() {
-    super.initState();
+  AdManager().loadInterstitialAd();
 
-    _controller = TextEditingController();
-  }
+  // Optional: Show ad once after 10 seconds
+  Timer(Duration(seconds: 10), () {
+    AdManager().showInterstitialAd();
+  });
+
+  // Then show every 4 minutes
+  _adTimer = Timer.periodic(Duration(minutes: 4), (timer) {
+    AdManager().showInterstitialAd();
+  });
+
+  _controller = TextEditingController();
+}
+
+
 
   @override
   void dispose() {
+    _adTimer?.cancel();
+    _interstitialAd?.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -200,264 +239,243 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
   }
 
   Future<void> _selectDate(BuildContext context) async {
-  List<int> daysOfWeek = [7, 6]; // Prevent weekends
+    List<int> daysOfWeek = [7, 6]; // Prevent weekends
 
-  DateTime initialDate = selectedDate ?? DateTime.now();
-  while (daysOfWeek.contains(initialDate.weekday)) {
-    initialDate = initialDate.add(Duration(days: 1));
-  }
+    DateTime initialDate = selectedDate ?? DateTime.now();
+    while (daysOfWeek.contains(initialDate.weekday)) {
+      initialDate = initialDate.add(Duration(days: 1));
+    }
 
-  Future.delayed(Duration.zero, () {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: "Date Picker",
-      transitionDuration: Duration(milliseconds: 250), // Smooth animation
-      pageBuilder: (context, anim1, anim2) {
-        return FadeTransition(
-          opacity: anim1,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.95, end: 1.0).animate(anim1),
-            child: Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Container(
-                padding: EdgeInsets.all(10),
-                child: _buildDatePicker(context, initialDate, daysOfWeek),
+    Future.delayed(Duration.zero, () {
+      
+      showGeneralDialog(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: "Date Picker",
+        transitionDuration: Duration(milliseconds: 250), // Smooth animation
+        pageBuilder: (context, anim1, anim2) {
+          return FadeTransition(
+            opacity: anim1,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.95, end: 1.0).animate(anim1),
+              child: Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Container(
+                  padding: EdgeInsets.all(10),
+                  child: _buildDatePicker(context, initialDate, daysOfWeek),
+                ),
               ),
             ),
-          ),
-        );
-      },
-      transitionBuilder: (context, anim1, anim2, child) {
-        return FadeTransition(
-          opacity: anim1,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.9, end: 1.0).animate(anim1),
-            child: child,
-          ),
-        );
-      },
-    );
-  });
-}
+          );
+        },
+        transitionBuilder: (context, anim1, anim2, child) {
+          return FadeTransition(
+            opacity: anim1,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.9, end: 1.0).animate(anim1),
+              child: child,
+            ),
+          );
+        },
+      );
+    });
+  }
 
 // Separate function to create a date picker widget
-Widget _buildDatePicker(BuildContext context, DateTime initialDate, List<int> daysOfWeek) {
-  return Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      CalendarDatePicker(
-        initialDate: initialDate,
-        firstDate: DateTime(2025, 1, 27),
-        lastDate: DateTime(2025, 2, 31),
-        selectableDayPredicate: (DateTime dateTime) =>
-            !daysOfWeek.contains(dateTime.weekday),
-        onDateChanged: (pickedDate) {
-          Navigator.of(context).pop(); // Close dialog when a date is selected
-          if (pickedDate != selectedDate) {
-            Provider.of<AppState>(context, listen: false).updateMainDate(pickedDate);
-            selectedDate = pickedDate;
-            isdateactive = true;
-            setState(() {}); // Refresh UI
-          }
-        },
-      ),
-    ],
-  );
-}
+  Widget _buildDatePicker(
+      BuildContext context, DateTime initialDate, List<int> daysOfWeek) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CalendarDatePicker(
 
-
+          initialDate: initialDate,
+            firstDate: DateTime.now().subtract(Duration(days: 20)),
+            lastDate: DateTime.now().add(Duration(days: 10)),
+          selectableDayPredicate: (DateTime dateTime) =>
+              !daysOfWeek.contains(dateTime.weekday),
+          onDateChanged: (pickedDate) {
+            Navigator.of(context).pop(); // Close dialog when a date is selected
+            if (pickedDate != selectedDate) {
+              Provider.of<AppState>(context, listen: false)
+                  .updateMainDate(pickedDate);
+              selectedDate = pickedDate;
+              isdateactive = true;
+              setState(() {}); // Refresh UI
+            }
+          },
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     // final appState = Provider.of<AppState>(context);
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      statusBarColor:
-          const Color.fromARGB(255, 0, 0, 0), // Change status bar background
-      statusBarIconBrightness: Brightness.light, // Light text/icons
-    ));
+    // SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+    //   statusBarColor:
+    //       const Color.fromARGB(255, 0, 0, 0), // Change status bar background
+    //   statusBarIconBrightness: Brightness.light, // Light text/icons
+    // ));
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Opacity(
-              opacity: 0.3,
-              child: Container(
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage(
-                      isbuttonactive
-                          ? isChecked1
-                              ? 'assets/madras.jpg'
-                              : 'assets/madurai.jpg'
-                          : 'assets/madras.jpg',
+    return SafeArea(
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Opacity(
+                opacity: 0.3,
+                child: Container(
+                  decoration: BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage(
+                        isbuttonactive
+                            ? isChecked1
+                                ? 'assets/madras.jpg'
+                                : 'assets/madurai.jpg'
+                            : 'assets/madras.jpg',
+                      ),
+                      fit: BoxFit.fitWidth,
+                      alignment: Alignment.bottomCenter,
                     ),
-                    fit: BoxFit.fitWidth,
-                    alignment: Alignment.bottomCenter,
                   ),
                 ),
               ),
-            ),
-            Column(
-              children: [
-                Expanded(
-                  child: Center(
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                "CAUSELIST",
-                                style: Tools.H1,
-                              ),
-                              PopupMenuButton<menuitems>(
-                                surfaceTintColor: Colors.white,
-                                popUpAnimationStyle: AnimationStyle(curve: Curves.easeInOut, duration: Duration(milliseconds: 300)),
-                                icon: const Icon(Icons.settings),
-                                color: Colors.white,
-                                itemBuilder: (BuildContext context) => [
-                                  const PopupMenuItem(
-                                    value: menuitems.about,
-                                    child: Text("About"),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: menuitems.share,
-                                    child: Text("Share"),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: menuitems.exit,
-                                    child: Text("Exit"),
-                                  ),
-                                ],
-                                onSelected: (value) {
-                                  switch (value) {
-                                    case menuitems.about:
-                                      Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                              builder: (context) =>
-                                                  const AboutPage()));
-                                      break;
-                                    case menuitems.share:
-                                      Share.share(
-                                          "Checkout this app! https://play.google.com/store/apps/details?id=mhc.file.mhcdb&hl=en_IN",
-                                          subject: "Look what I found!");
-                                      break;
-                                    case menuitems.exit:
-                                      SystemNavigator.pop();
-                                      break;
-                                  }
-                                },
-                              ),
-                            ],
+              Column(
+                children: [
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  "CAUSELIST",
+                                  style: Tools.H1,
+                                ),
+                                PopupMenuButton<menuitems>(
+                                  surfaceTintColor: Colors.white,
+                                  popUpAnimationStyle: AnimationStyle(
+                                      curve: Curves.easeInOut,
+                                      duration: Duration(milliseconds: 300)),
+                                  icon: const Icon(Icons.settings),
+                                  color: Colors.white,
+                                  itemBuilder: (BuildContext context) => [
+                                    const PopupMenuItem(
+                                      value: menuitems.about,
+                                      child: Text("About"),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: menuitems.feedBack,
+                                      child: Text("Feedback"),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: menuitems.share,
+                                      child: Text("Share"),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: menuitems.exit,
+                                      child: Text("Exit"),
+                                    ),
+                                  ],
+                                  onSelected: (value) {
+                                    switch (value) {
+                                      case menuitems.about:
+                                        Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const AboutPage()));
+                                        break;
+                                      case menuitems.share:
+                                        Share.share(
+                                            "Checkout this app! https://play.google.com/store/apps/details?id=mhc.file.mhcdb&hl=en_IN",
+                                            subject: "Look what I found!");
+                                        break;
+                                      case menuitems.feedBack:
+                                        FeedbackDialog.show(context);
+                                        break;
+                                      case menuitems.exit:
+                                        SystemNavigator.pop();
+                                        break;
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(0, 5, 0, 0),
-                          child: Container(
-                            width: double.maxFinite,
-                            color: Colors.black,
-                            child: Padding(
-                              padding: const EdgeInsets.all(5.0),
-                              child: Center(
-                                child: Text(
-                                  "Madras High Court",
-                                  style: Tools.H2.copyWith(color: Colors.white),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(0, 5, 0, 0),
+                            child: Container(
+                              width: double.maxFinite,
+                              color: Colors.black,
+                              child: Padding(
+                                padding: const EdgeInsets.all(5.0),
+                                child: Center(
+                                  child: Text(
+                                    "Madras High Court",
+                                    style: Tools.H2.copyWith(color: Colors.white),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 15),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: CheckboxListTile(
-                                      title: const Text(
-                                        "Madras",
-                                        style: Tools.H3,
-                                      ),
-                                      value: isChecked1,
-                                      checkColor: Colors.black,
-                                      activeColor: Colors.transparent,
-                                      onChanged: _onChanged1,
-                                      controlAffinity:
-                                          ListTileControlAffinity.leading,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: CheckboxListTile(
-                                      checkColor: Colors.black,
-                                      activeColor: Colors.transparent,
-                                      title: const Text(
-                                        "Madurai",
-                                        style: Tools.H3,
-                                      ),
-                                      value: isChecked2,
-                                      onChanged: _onChanged2,
-                                      controlAffinity:
-                                          ListTileControlAffinity.leading,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 15),
-                              AnimatedOpacity(
-                                curve: Curves.ease,
-                                opacity: isbuttonactive ? 1.0 : 0.0,
-                                duration: const Duration(milliseconds: 600),
-                                child: Padding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceAround,
-                                    children: [
-                                      Text(
-                                        "Select Date:",
-                                        style: TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          color: isbuttonactive
-                                              ? Colors.black
-                                              : const Color.fromARGB(
-                                                  255, 192, 192, 192),
-                                          fontFamily: 'H1',
+                          const SizedBox(height: 15),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+                            child: Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: CheckboxListTile(
+                                        title: const Text(
+                                          "Madras",
+                                          style: Tools.H3,
                                         ),
+                                        value: isChecked1,
+                                        checkColor: Colors.black,
+                                        activeColor: Colors.transparent,
+                                        onChanged: _onChanged1,
+                                        controlAffinity:
+                                            ListTileControlAffinity.leading,
                                       ),
-                                      TextButton(
-                                        onPressed: isbuttonactive
-                                            ? () => _selectDate(context)
-                                            : null,
-                                        style: TextButton.styleFrom(
-                                          foregroundColor: isbuttonactive
-                                              ? Colors.black
-                                              : Colors.grey[600],
-                                          backgroundColor: isbuttonactive
-                                              ? Colors.grey[200]
-                                              : Colors.grey[300],
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 17, vertical: 10),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(5),
-                                          ),
+                                    ),
+                                    Expanded(
+                                      child: CheckboxListTile(
+                                        checkColor: Colors.black,
+                                        activeColor: Colors.transparent,
+                                        title: const Text(
+                                          "Madurai",
+                                          style: Tools.H3,
                                         ),
-                                        child: Text(
-                                          selectedDate != null
-                                              ? DateFormat('dd/MM/yyyy')
-                                                  .format(selectedDate!)
-                                              : "Choose Date",
+                                        value: isChecked2,
+                                        onChanged: _onChanged2,
+                                        controlAffinity:
+                                            ListTileControlAffinity.leading,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 15),
+                                AnimatedOpacity(
+                                  curve: Curves.ease,
+                                  opacity: isbuttonactive ? 1.0 : 0.0,
+                                  duration: const Duration(milliseconds: 600),
+                                  child: Padding(
+                                    padding:
+                                        const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceAround,
+                                      children: [
+                                        Text(
+                                          "Select Date:",
                                           style: TextStyle(
                                             fontSize: 20,
                                             fontWeight: FontWeight.bold,
@@ -468,102 +486,137 @@ Widget _buildDatePicker(BuildContext context, DateTime initialDate, List<int> da
                                             fontFamily: 'H1',
                                           ),
                                         ),
-                                      ),
-                                    ],
+                                        TextButton(
+                                          
+                                          onPressed: isbuttonactive
+                                              ? () => _selectDate(context)
+                                              : null,
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: isbuttonactive
+                                                ? Colors.black
+                                                : Colors.grey[600],
+                                            backgroundColor: isbuttonactive
+                                                ? Colors.grey[200]
+                                                : Colors.grey[300],
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 17, vertical: 10),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(5),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            selectedDate != null
+                                                ? DateFormat('dd/MM/yyyy')
+                                                    .format(selectedDate!)
+                                                : "Choose Date",
+                                            style: TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: isbuttonactive
+                                                  ? Colors.black
+                                                  : const Color.fromARGB(
+                                                      255, 192, 192, 192),
+                                              fontFamily: 'H1',
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 20),
-                              AnimatedOpacity(
-                                curve: Curves.ease,
-                                opacity: isdateactive ? 1.0 : 0.0,
-                                duration: const Duration(milliseconds: 500),
-                                child: isdateactive
-                                    ? Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                            30, 0, 20, 0),
-                                        child: Column(
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Flexible(
-                                                  flex: 1,
-                                                  child: Align(
-                                                    alignment:
-                                                        Alignment.centerLeft,
-                                                    child: Text(
-                                                      "Advocate:",
-                                                      style: TextStyle(
-                                                        fontSize: 20,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color: isdateactive
-                                                            ? Colors.black
-                                                            : const Color
-                                                                .fromARGB(255,
-                                                                192, 192, 192),
-                                                        fontFamily: 'H1',
+                                const SizedBox(height: 20),
+                                AnimatedOpacity(
+                                  curve: Curves.ease,
+                                  opacity: isdateactive ? 1.0 : 0.0,
+                                  duration: const Duration(milliseconds: 500),
+                                  child: isdateactive
+                                      ? Padding(
+                                          padding: const EdgeInsets.fromLTRB(
+                                              30, 0, 20, 0),
+                                          child: Column(
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Flexible(
+                                                    flex: 1,
+                                                    child: Align(
+                                                      alignment:
+                                                          Alignment.centerLeft,
+                                                      child: Text(
+                                                        "Advocate:",
+                                                        style: TextStyle(
+                                                          fontSize: 20,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          color: isdateactive
+                                                              ? Colors.black
+                                                              : const Color
+                                                                  .fromARGB(255,
+                                                                  192, 192, 192),
+                                                          fontFamily: 'H1',
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
-                                                ),
-                                                Flexible(
-                                                  flex: 1,
-                                                  child: Align(
-                                                    alignment:
-                                                        Alignment.centerLeft,
-                                                    child: TextFormField(
-                                                      controller: _controller,
-                                                      onChanged:
-                                                          (String value) {
-                                                        final appstate =
-                                                            Provider.of<
-                                                                    AppState>(
-                                                                context,
-                                                                listen: false);
-                                                        appstate.changeAdvName(
-                                                            value);
-                                                      },
-                                                      decoration:
-                                                          const InputDecoration(
-                                                        hintText:
-                                                            "Advocate Name",
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                        fillColor: Colors.white,
-                                                        filled: true,
+                                                  Flexible(
+                                                    flex: 1,
+                                                    child: Align(
+                                                      alignment:
+                                                          Alignment.centerLeft,
+                                                      child: TextFormField(
+                                                        controller: _controller,
+                                                        onChanged:
+                                                            (String value) {
+                                                          final appstate =
+                                                              Provider.of<
+                                                                      AppState>(
+                                                                  context,
+                                                                  listen: false);
+                                                          appstate.changeAdvName(
+                                                              value);
+                                                        },
+                                                        decoration:
+                                                            const InputDecoration(
+                                                          hintText:
+                                                              "Advocate Name",
+                                                          border:
+                                                              OutlineInputBorder(),
+                                                          fillColor: Colors.white,
+                                                          filled: true,
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
-                                                ),
-                                              ],
-                                            ),
-                                            const Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Padding(
-                                                  padding: EdgeInsets.all(20.0),
-                                                  child: CustomButton(),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      )
-                                    : Container(),
-                              ),
-                            ],
+                                                ],
+                                              ),
+                                              const Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Padding(
+                                                    padding: EdgeInsets.all(20.0),
+                                                    child: CustomButton(),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : Container(),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                RefreshableBannerAdWidget(),
-              ],
-            ),
-          ],
+                  RefreshableBannerAdWidget(),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -735,69 +788,5 @@ class _AdvSrhState extends State<AdvSrh> {
         ),
       ),
     );
-  }
-}
-
-class RefreshableBannerAdWidget extends StatefulWidget {
-  @override
-  _RefreshableBannerAdWidgetState createState() =>
-      _RefreshableBannerAdWidgetState();
-}
-
-class _RefreshableBannerAdWidgetState extends State<RefreshableBannerAdWidget> {
-  late BannerAd _bannerAd;
-  bool _isAdLoaded = false;
-  Timer? _adRefreshTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadBannerAd();
-    _startAdRefreshTimer();
-  }
-
-  void _startAdRefreshTimer() {
-    _adRefreshTimer = Timer.periodic(Duration(minutes: 1), (timer) {
-      // Fluttertoast.showToast(msg: "Ad Refreshing");
-      _loadBannerAd();
-    });
-  }
-
-  void _loadBannerAd() {
-    _bannerAd = BannerAd(
-      adUnitId: 'ca-app-pub-3940256099942544/9214589741',
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (_) {
-          setState(() {
-            _isAdLoaded = true;
-          });
-        },
-        onAdFailedToLoad: (ad, error) {
-          print('Ad failed to load: $error');
-          ad.dispose();
-        },
-      ),
-    )..load();
-  }
-
-  @override
-  void dispose() {
-    _adRefreshTimer?.cancel();
-    _bannerAd.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _isAdLoaded
-        ? Container(
-            alignment: Alignment.center,
-            width: _bannerAd.size.width.toDouble(),
-            height: _bannerAd.size.height.toDouble(),
-            child: AdWidget(ad: _bannerAd),
-          )
-        : SizedBox(); // Optionally show a placeholder or loading widget here
   }
 }

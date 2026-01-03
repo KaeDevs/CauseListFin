@@ -1,3 +1,4 @@
+import 'package:fincauselist/Constants/constants.dart';
 import 'package:fincauselist/main.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -15,8 +16,9 @@ Future<List<dynamic>> fetchCasesAllAdv(BuildContext context, {int page = 1, int 
   final selectedCourt = Provider.of<AppState>(context, listen: false).selected_court;
   final date = Provider.of<AppState>(context, listen: false).mainDate;
   // String oldlink = "https://causelistapi.onrender.com/";
-  String link = "https://cause-api.vercel.app/";
-  String link2 = "http://192.168.1.3:3000";
+  // String link = "https://cause-api.vercel.app/";
+  // String link2 = "http://192.168.1.3:3000";
+  String mainlink = Constants().mainLink;
   String dist = "";
   if(selectedCourt == 0){
     dist = "madr";
@@ -27,9 +29,9 @@ Future<List<dynamic>> fetchCasesAllAdv(BuildContext context, {int page = 1, int 
 
 
 
-  final response = await http.get(Uri.parse('https://causelistapi.onrender.com/data/$dist?date=$date&page=$page&limit=$limit'));
+  final response = await http.get(Uri.parse('${mainlink}data/$dist?date=$date&page=$page&limit=$limit'));
 
-  print('https://causelistapi.onrender.com/data/$dist?date=$date&page=$page&limit=$limit');
+  print('${mainlink}data/$dist?date=$date&page=$page&limit=$limit');
   if (response.statusCode == 200) {
     print(jsonDecode(response.body));
     final jsonResponse = jsonDecode(response.body);
@@ -40,12 +42,13 @@ Future<List<dynamic>> fetchCasesAllAdv(BuildContext context, {int page = 1, int 
   }
 }
 Future<List<dynamic>> fetchCasesAdvPresent(BuildContext context, {int page = 1, int limit = 20}) async {
+  String mainlink = Constants().mainLink;
   final advName = AppState().advName;
   final date = Provider.of<AppState>(context, listen: false).mainDate;
   final selectedCourt = Provider.of<AppState>(context, listen: false).selected_court;
   String dist = selectedCourt == 0 ? "madr" : "mdu";
   
-  final response = await http.get(Uri.parse('https://causelistapi.onrender.com/dataoa/$advName/$dist?date=$date'));
+  final response = await http.get(Uri.parse('${mainlink}dataoa/$advName/$dist?date=$date'));
 
   if (response.statusCode == 200) {
     final jsonResponse = jsonDecode(response.body);
@@ -62,8 +65,10 @@ Future<List<dynamic>> fetchCasesAdvPresent(BuildContext context, {int page = 1, 
   }
 }
 Future<Map<String, List<dynamic>>> fetchCourts(BuildContext context, ) async {
+  print("📈Fetching Courts Once");
   final selectedCourt = Provider.of<AppState>(context, listen: false).selected_court;
   final date = Provider.of<AppState>(context, listen: false).mainDate;
+  String mainlink = Constants().mainLink;
   String dist = "";
   if(selectedCourt == 0){
     dist = "madr";
@@ -71,14 +76,17 @@ Future<Map<String, List<dynamic>>> fetchCourts(BuildContext context, ) async {
   else{
     dist = "mdu";
   }
-  final response = await http.get(Uri.parse('https://causelistapi.onrender.com/courts/$dist?date=$date'));
+  print("📈${dist}");
+  String uri = '${mainlink}courts/$dist?date=$date';
+  print(  "📈${uri}");
+  final response = await http.get(Uri.parse(uri));
 
   if (response.statusCode == 200) {
     print("Courts Fetching");
     final jsonResponse = jsonDecode(response.body);
-    
+    print("📈${jsonResponse}");
     // Access the "CList" key
-    final courtsMap = jsonResponse["CList"];  // This should be of type Map<String, dynamic>
+    final courtsMap = jsonResponse["cList"];  // This should be of type Map<String, dynamic>
 
     // Ensure the structure is as expected and cast to Map<String, List<dynamic>>
     if (courtsMap is Map<String, dynamic>) {
@@ -93,6 +101,7 @@ Future<Map<String, List<dynamic>>> fetchCourts(BuildContext context, ) async {
           print('Warning: courtData for $courtNumber is not a list. Got: ${courtData.runtimeType}');
         }
       });
+      print("📈${formattedCourtsMap}");
 
       return formattedCourtsMap; // Return the formatted map
     } else {
@@ -108,7 +117,8 @@ Future<Map<String, List<dynamic>>> fetchCourts(BuildContext context, ) async {
 
 
 Future<List<dynamic>> fetchKeys() async {
-  final response = await http.get(Uri.parse('https://causelistapi.onrender.com/keys'));
+  String mainlink = Constants().mainLink;
+  final response = await http.get(Uri.parse('${mainlink}keys'));
 
   if (response.statusCode == 200) {
     print(jsonDecode(response.body));
