@@ -32,18 +32,33 @@ class _ListPageState extends State<ListPage> {
       _fetchCourtsOnce();
       start = false;
     }
-    if (AppState().advName == "") {
+    
+    // Check if there are selected courts from AppState
+    final appState = AppState();
+    final selectedCourts = appState.selectedCourts;
+    
+    if (selectedCourts.isNotEmpty) {
+      // Fetch court-specific data
+      _fetchCourtSpecificCases();
+    } else if (AppState().advName == "") {
       _fetchPaginatedCases(true);
       print("true adv all");
     } else {
       _fetchPaginatedCases(false);
       print("false adv present");
     }
+    
     _scrollController.addListener(() {
       if (_scrollController.position.pixels ==
               _scrollController.position.maxScrollExtent &&
           !isLoading) {
-        if (AppState().advName == "") {
+        final appState = AppState();
+        final selectedCourts = appState.selectedCourts;
+        
+        if (selectedCourts.isNotEmpty) {
+          // For court-specific searches, we don't implement pagination yet
+          // All courts data is fetched at once
+        } else if (AppState().advName == "") {
           _fetchPaginatedCases(true);
           print("true adv all");
         } else {
@@ -97,6 +112,48 @@ class _ListPageState extends State<ListPage> {
             isLoading = false;
           });
         }
+      }
+    }
+  }
+
+  // Fetch cases for selected courts
+  Future<void> _fetchCourtSpecificCases() async {
+    final appState = AppState();
+    final selectedCourts = appState.selectedCourts;
+    
+    if (selectedCourts.isEmpty) return;
+    
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Get advocate name if provided
+      final advocateName = appState.advName.trim().isEmpty ? null : appState.advName.trim();
+      
+      List<dynamic> courtCases = await fetchCasesForCourts(
+        context, 
+        selectedCourts, 
+        advocateName: advocateName
+      );
+      
+      if (mounted) {
+        setState(() {
+          cases = courtCases;
+          hasMore = false; // No pagination for court-specific searches
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          print('Error fetching court cases: $error');
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
       }
     }
   }

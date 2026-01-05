@@ -3,13 +3,8 @@ import 'package:fincauselist/main.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
-import 'package:fincauselist/listpage.dart';
-import 'package:fluttertoast/fluttertoast.dart';
-import 'package:fincauselist/about.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 
 
 Future<List<dynamic>> fetchCasesAllAdv(BuildContext context, {int page = 1, int limit = 20}) async {
@@ -127,6 +122,80 @@ Future<List<dynamic>> fetchKeys() async {
     return jsonResponse; 
   } else {
     throw Exception('Failed to load cases');
+  }
+}
+
+// Fetch available courts for a specific date and district
+Future<List<String>> fetchAvailableCourts(BuildContext context) async {
+  final selectedCourt = Provider.of<AppState>(context, listen: false).selected_court;
+  final date = Provider.of<AppState>(context, listen: false).mainDate;
+  String mainlink = Constants().mainLink;
+  String dist = selectedCourt == 0 ? "madr" : "mdu";
+  
+  final response = await http.get(Uri.parse('${mainlink}keys/$dist?date=$date'));
+  
+  if (response.statusCode == 200) {
+    final List<dynamic> courtsList = jsonDecode(response.body);
+    
+    // Filter and process court numbers
+    return courtsList
+        .where((court) => court.toString().contains(RegExp(r'COURT NO\. \d+')))
+        .map((court) => court.toString().replaceAll('COURT NO. ', ''))
+        .toList();
+  } else {
+    throw Exception('Failed to load courts');
+  }
+}
+
+// Fetch cases for specific courts
+Future<List<dynamic>> fetchCasesForCourts(BuildContext context, List<String> courts, {String? advocateName}) async {
+  final selectedCourt = Provider.of<AppState>(context, listen: false).selected_court;
+  final date = Provider.of<AppState>(context, listen: false).mainDate;
+  String mainlink = Constants().mainLink;
+  String dist = selectedCourt == 0 ? "madr" : "mdu";
+  
+  List<dynamic> allCases = [];
+  
+  try {
+    // Fetch data from all selected courts
+    for (String courtNumber in courts) {
+      String url;
+      if (advocateName != null && advocateName.trim().isNotEmpty) {
+        // API call with advocate name and court number
+        url = '${mainlink}dataoa/$advocateName/$dist?date=$date&courtNumber=$courtNumber';
+      } else {
+        // API call with just court number (null advocate)
+        url = '${mainlink}dataoa/null/$dist?date=$date&courtNumber=$courtNumber';
+      }
+      
+      print('Fetching from: $url');
+      final response = await http.get(Uri.parse(url));
+      
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        if (jsonResponse['cases'] != null && jsonResponse['cases'] is List) {
+          allCases.addAll(jsonResponse['cases']);
+        }
+      } else if (response.statusCode == 404) {
+        print('No cases found for court $courtNumber');
+        // Continue with other courts even if one returns 404
+      } else {
+        print('Failed to load cases for court $courtNumber: ${response.statusCode}');
+      }
+    }
+    
+    // Remove duplicates based on case_number
+    final Map<String, dynamic> uniqueCases = {};
+    for (var case_ in allCases) {
+      if (case_['case_number'] != null) {
+        uniqueCases[case_['case_number']] = case_;
+      }
+    }
+    
+    return uniqueCases.values.toList();
+  } catch (e) {
+    print('Error fetching court cases: $e');
+    throw Exception('Failed to load court cases');
   }
 }
 

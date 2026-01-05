@@ -5,6 +5,12 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.example.fincauselist"
     compileSdk = flutter.compileSdkVersion
@@ -27,14 +33,39 @@ android {
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
-        versionName = flutter.versionName
+    versionName = flutter.versionName
+}
+
+signingConfigs {
+    release {
+        def storeFilePath = keystoreProperties['storeFile']
+        if (!storeFilePath) {
+            throw new IllegalStateException("Missing 'storeFile' in key.properties")
+        }
+        def storePasswordValue = keystoreProperties['storePassword']
+        if (!storePasswordValue) {
+            throw new IllegalStateException("Missing 'storePassword' in key.properties")
+        }
+        def keyAliasValue = keystoreProperties['keyAlias']
+        if (!keyAliasValue) {
+            throw new IllegalStateException("Missing 'keyAlias' in key.properties")
+        }
+        def keyPasswordValue = keystoreProperties['keyPassword']
+        if (!keyPasswordValue) {
+            throw new IllegalStateException("Missing 'keyPassword' in key.properties")
+        }
+        storeFile file(storeFilePath)
+        storePassword storePasswordValue
+        keyAlias keyAliasValue
+        keyPassword keyPasswordValue
     }
+}
 
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

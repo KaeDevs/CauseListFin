@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:fincauselist/Constants/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -13,7 +14,7 @@ class AdManager {
 
   void loadInterstitialAd() {
     InterstitialAd.load(
-      adUnitId: 'ca-app-pub-3940256099942544/1033173712',
+      adUnitId: AdConstants().interstitialAdUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {
@@ -81,7 +82,7 @@ class _RefreshableBannerAdWidgetState extends State<RefreshableBannerAdWidget> {
   void _loadBannerAd() {
     // _bannerAd.dispose();
     _bannerAd = BannerAd(
-      adUnitId: 'ca-app-pub-3940256099942544/9214589741',
+      adUnitId: AdConstants().bannerAdUnitId,
       size: AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(
