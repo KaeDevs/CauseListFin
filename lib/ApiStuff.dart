@@ -137,65 +137,94 @@ Future<List<String>> fetchAvailableCourts(BuildContext context) async {
   if (response.statusCode == 200) {
     final List<dynamic> courtsList = jsonDecode(response.body);
     
-    // Filter and process court numbers
-    return courtsList
-        .where((court) => court.toString().contains(RegExp(r'COURT NO\. \d+')))
-        .map((court) => court.toString().replaceAll('COURT NO. ', ''))
-        .toList();
+    List<String> processedCourts = [];
+    
+    for (var court in courtsList) {
+      String courtStr = court.toString();
+      
+      // Handle numeric courts with possible subdivisions
+      RegExp numericCourtRegex = RegExp(r'COURT NO\. (\d+(?:\s*[a-zA-Z])?)(?:\s|$)', caseSensitive: false);
+      Match? numericMatch = numericCourtRegex.firstMatch(courtStr);
+      
+      if (numericMatch != null) {
+        String courtNumber = numericMatch.group(1)!.trim();
+        processedCourts.add(courtNumber);
+        continue;
+      }
+      
+      // Handle judge chambers (convert to court 0)
+      if (courtStr.toLowerCase().contains('justice') || 
+          courtStr.toLowerCase().contains('judge')) {
+        if (!processedCourts.contains('0')) {
+          processedCourts.add('0');
+        }
+        continue;
+      }
+      
+      // Handle special chambers
+      RegExp chambersRegex = RegExp(r'([a-zA-Z]+(?:\s*[a-zA-Z]*)?)\s*chambers', caseSensitive: false);
+      Match? chambersMatch = chambersRegex.firstMatch(courtStr);
+      
+      if (chambersMatch != null) {
+        String chambersName = chambersMatch.group(1)!.trim().toLowerCase();
+        processedCourts.add('$chambersName chambers');
+        continue;
+      }
+    }
+    
+    return processedCourts.toSet().toList();
   } else {
     throw Exception('Failed to load courts');
   }
 }
 
-// Fetch cases for specific courts
+// Fetch cases for specific courts using new enhanced API
 Future<List<dynamic>> fetchCasesForCourts(BuildContext context, List<String> courts, {String? advocateName}) async {
   final selectedCourt = Provider.of<AppState>(context, listen: false).selected_court;
   final date = Provider.of<AppState>(context, listen: false).mainDate;
   String mainlink = Constants().mainLink;
   String dist = selectedCourt == 0 ? "madr" : "mdu";
   
-  List<dynamic> allCases = [];
-  
   try {
-    // Fetch data from all selected courts
-    for (String courtNumber in courts) {
-      String url;
-      if (advocateName != null && advocateName.trim().isNotEmpty) {
-        // API call with advocate name and court number
-        url = '${mainlink}dataoa/$advocateName/$dist?date=$date&courtNumber=$courtNumber';
-      } else {
-        // API call with just court number (null advocate)
-        url = '${mainlink}dataoa/null/$dist?date=$date&courtNumber=$courtNumber';
-      }
-      
-      print('Fetching from: $url');
-      final response = await http.get(Uri.parse(url));
-      
-      if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        if (jsonResponse['cases'] != null && jsonResponse['cases'] is List) {
-          allCases.addAll(jsonResponse['cases']);
-        }
-      } else if (response.statusCode == 404) {
-        print('No cases found for court $courtNumber');
-        // Continue with other courts even if one returns 404
-      } else {
-        print('Failed to load cases for court $courtNumber: ${response.statusCode}');
-      }
+    // Prepare court numbers with proper encoding
+    List<String> encodedCourts = courts.map((court) {
+      // URL encode spaces and special characters
+      return Uri.encodeComponent(court);
+    }).toList();
+    
+    // Join courts with comma for multiple court selection
+    String courtNumbers = encodedCourts.join(',');
+    
+    String url;
+    if (advocateName != null && advocateName.trim().isNotEmpty) {
+      // API call with advocate name and multiple courts
+      url = '${mainlink}dataoa/$advocateName/$dist?date=$date&courtNumbers=$courtNumbers';
+    } else {
+      // API call with just court numbers (null advocate)
+      url = '${mainlink}dataoa/null/$dist?date=$date&courtNumbers=$courtNumbers';
     }
     
-    // Remove duplicates based on case_number
-    final Map<String, dynamic> uniqueCases = {};
-    for (var case_ in allCases) {
-      if (case_['case_number'] != null) {
-        uniqueCases[case_['case_number']] = case_;
-      }
-    }
+    print('Fetching from: $url');
+    final response = await http.get(Uri.parse(url));
     
-    return uniqueCases.values.toList();
+    if (response.statusCode == 200) {
+      final jsonResponse = jsonDecode(response.body);
+      if (jsonResponse['cases'] != null && jsonResponse['cases'] is List) {
+        return jsonResponse['cases'];
+      } else {
+        return [];
+      }
+    } else if (response.statusCode == 404) {
+      final jsonResponse = jsonDecode(response.body);
+      String errorMessage = jsonResponse['message'] ?? 'No cases found for selected courts';
+      print('No cases found: $errorMessage');
+      return [];
+    } else {
+      throw Exception('Failed to load cases: HTTP ${response.statusCode}');
+    }
   } catch (e) {
     print('Error fetching court cases: $e');
-    throw Exception('Failed to load court cases');
+    throw Exception('Failed to load court cases: $e');
   }
 }
 

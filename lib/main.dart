@@ -218,6 +218,8 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
         isChecked1 = value!;
         isChecked2 = !value;
         isbuttonactive = true;
+        selectedCourts.clear(); // Clear courts when district changes
+        appState.updateSelectedCourts([]); // Update AppState as well
         if (firsttimeselect == false) {
           appState.toggleSelected();
         } else {
@@ -235,6 +237,8 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
         isChecked2 = value!;
         isChecked1 = !value;
         isbuttonactive = true;
+        selectedCourts.clear(); // Clear courts when district changes
+        appState.updateSelectedCourts([]); // Update AppState as well
         if (firsttimeselect == false) {
           appState.toggleSelected();
         } else {
@@ -250,184 +254,16 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Container(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.6,
-                  maxWidth: MediaQuery.of(context).size.width * 0.8,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Header
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: const BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(15),
-                          topRight: Radius.circular(15),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Select Courts",
-                            style: Tools.H2.copyWith(color: Colors.white),
-                          ),
-                          GestureDetector(
-                            onTap: () => Navigator.of(context).pop(),
-                            child: const Icon(
-                              Icons.close,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Court list
-                    Flexible(
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        child: FutureBuilder<List<String>>(
-                          future: _loadAvailableCourts(),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
-                              return const Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    CircularProgressIndicator(
-                                      color: Colors.black,
-                                    ),
-                                    SizedBox(height: 16),
-                                    Text(
-                                      "Loading courts...",
-                                      style: Tools.H3,
-                                    ),
-                                  ],
-                                ),
-                              );
-                            } else if (snapshot.hasError) {
-                              return Center(
-                                child: Text(
-                                  "Error loading courts: ${snapshot.error}",
-                                  style: Tools.H3.copyWith(color: Colors.red),
-                                  textAlign: TextAlign.center,
-                                ),
-                              );
-                            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                              return const Center(
-                                child: Text(
-                                  "No courts available for this date",
-                                  style: Tools.H3,
-                                ),
-                              );
-                            }
-                            
-                            final courts = snapshot.data!;
-                            return ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: courts.length,
-                              itemBuilder: (context, index) {
-                                final court = courts[index];
-                                final isSelected = selectedCourts.contains(court);
-                                
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? Colors.grey[200] : Colors.white,
-                                    border: Border.all(
-                                      color: isSelected ? Colors.black : Colors.grey[300]!,
-                                      width: isSelected ? 2 : 1,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: ListTile(
-                                    title: Text(
-                                      "Court No. $court",
-                                      style: Tools.H3.copyWith(
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                      ),
-                                    ),
-                                    trailing: isSelected
-                                        ? const Icon(Icons.check, color: Colors.black)
-                                        : null,
-                                    onTap: () {
-                                      setDialogState(() {
-                                        if (isSelected) {
-                                          selectedCourts.remove(court);
-                                        } else {
-                                          selectedCourts.add(court);
-                                        }
-                                      });
-                                    },
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                    // Footer with buttons
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(15),
-                          bottomRight: Radius.circular(15),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "${selectedCourts.length} selected",
-                            style: Tools.H3.copyWith(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          ElevatedButton(
-                            onPressed: selectedCourts.isNotEmpty
-                                ? () {
-                                    // Update AppState with selected courts
-                                    final appState = Provider.of<AppState>(context, listen: false);
-                                    appState.updateSelectedCourts(selectedCourts);
-                                    
-                                    Navigator.of(context).pop();
-                                    setState(() {});
-                                  }
-                                : null,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.black,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text("OK"),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
+        return _CourtSelectionDialog(
+          selectedCourts: selectedCourts,
+          onCourtsSelected: (courts) {
+            setState(() {
+              selectedCourts = courts;
+            });
+            final appState = Provider.of<AppState>(context, listen: false);
+            appState.updateSelectedCourts(courts);
           },
+          onLoadCourts: _loadAvailableCourts,
         );
       },
     );
@@ -447,10 +283,64 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
     if (response.statusCode == 200) {
       final List<dynamic> courtsList = jsonDecode(response.body);
       
-      return courtsList
-          .where((court) => court.toString().contains(RegExp(r'COURT NO\. \d+')))
-          .map((court) => court.toString().replaceAll('COURT NO. ', ''))
-          .toList();
+      List<String> processedCourts = [];
+      
+      for (var court in courtsList) {
+        String courtStr = court.toString();
+        
+        // Handle numeric courts with possible subdivisions (e.g., "COURT NO. 03 a")
+        RegExp numericCourtRegex = RegExp(r'COURT NO\. (\d+(?:\s*[a-zA-Z])?)(?:\s|$)', caseSensitive: false);
+        Match? numericMatch = numericCourtRegex.firstMatch(courtStr);
+        
+        if (numericMatch != null) {
+          String courtNumber = numericMatch.group(1)!.trim();
+          processedCourts.add(courtNumber);
+          continue;
+        }
+        
+        // Handle judge chambers (convert to court 0)
+        if (courtStr.toLowerCase().contains('justice') || 
+            courtStr.toLowerCase().contains('judge')) {
+          if (!processedCourts.contains('0')) {
+            processedCourts.add('0');
+          }
+          continue;
+        }
+        
+        // Handle special chambers (e.g., "csnj chambers", "skrj chambers a")
+        RegExp chambersRegex = RegExp(r'([a-zA-Z]+(?:\s*[a-zA-Z]*)?)\s*chambers', caseSensitive: false);
+        Match? chambersMatch = chambersRegex.firstMatch(courtStr);
+        
+        if (chambersMatch != null) {
+          String chambersName = chambersMatch.group(1)!.trim().toLowerCase();
+          processedCourts.add('$chambersName chambers');
+          continue;
+        }
+      }
+      
+      // Remove duplicates and sort
+      processedCourts = processedCourts.toSet().toList();
+      processedCourts.sort((a, b) {
+        // Sort numeric courts first, then chambers
+        bool aIsNumeric = RegExp(r'^\d+(?:\s*[a-zA-Z])?$').hasMatch(a);
+        bool bIsNumeric = RegExp(r'^\d+(?:\s*[a-zA-Z])?$').hasMatch(b);
+        
+        if (aIsNumeric && bIsNumeric) {
+          // Extract numeric part for comparison
+          int aNum = int.parse(RegExp(r'^(\d+)').firstMatch(a)!.group(1)!);
+          int bNum = int.parse(RegExp(r'^(\d+)').firstMatch(b)!.group(1)!);
+          if (aNum != bNum) return aNum.compareTo(bNum);
+          return a.compareTo(b); // For subdivisions like "3 a" vs "3 b"
+        } else if (aIsNumeric) {
+          return -1;
+        } else if (bIsNumeric) {
+          return 1;
+        } else {
+          return a.compareTo(b);
+        }
+      });
+      
+      return processedCourts;
     } else {
       throw Exception('Failed to load courts');
     }
@@ -826,7 +716,7 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
                                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                                             children: [
                                               Text(
-                                                "Search by Court:",
+                                                "Court👑:",
                                                 style: TextStyle(
                                                   fontSize: 20,
                                                   fontWeight: FontWeight.bold,
@@ -834,6 +724,7 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
                                                   fontFamily: 'H1',
                                                 ),
                                               ),
+                                              Spacer(),
                                               TextButton(
                                                 onPressed: iscourtselectionactive ? _showCourtSelectionDialog : null,
                                                 style: TextButton.styleFrom(
@@ -846,7 +737,7 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
                                                 ),
                                                 child: Text(
                                                   selectedCourts.isEmpty
-                                                      ? "Select Courts"
+                                                      ? "All Courts"
                                                       : "${selectedCourts.length} Court${selectedCourts.length > 1 ? 's' : ''}",
                                                   style: TextStyle(
                                                     fontSize: 20,
@@ -1145,6 +1036,243 @@ class _AdvSrhState extends State<AdvSrh> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CourtSelectionDialog extends StatefulWidget {
+  final List<String> selectedCourts;
+  final Function(List<String>) onCourtsSelected;
+  final Future<List<String>> Function() onLoadCourts;
+
+  const _CourtSelectionDialog({
+    required this.selectedCourts,
+    required this.onCourtsSelected,
+    required this.onLoadCourts,
+  });
+
+  @override
+  State<_CourtSelectionDialog> createState() => _CourtSelectionDialogState();
+}
+
+class _CourtSelectionDialogState extends State<_CourtSelectionDialog> {
+  List<String> _selectedCourts = [];
+  List<String>? _availableCourts;
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCourts = List.from(widget.selectedCourts);
+    _loadCourts();
+  }
+
+  Future<void> _loadCourts() async {
+    try {
+      final courts = await widget.onLoadCourts();
+      if (mounted) {
+        setState(() {
+          _availableCourts = courts;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _toggleCourtSelection(String court) {
+    setState(() {
+      if (_selectedCourts.contains(court)) {
+        _selectedCourts.remove(court);
+      } else {
+        _selectedCourts.add(court);
+      }
+    });
+  }
+
+  String _formatCourtDisplay(String court) {
+    // Handle judge courts (court 0)
+    if (court == '0') {
+      return 'Judge Chambers';
+    }
+    
+    // Handle special chambers
+    if (court.toLowerCase().contains('chambers')) {
+      return court.toUpperCase();
+    }
+    
+    // Handle numeric courts (with possible subdivisions)
+    if (RegExp(r'^\d+(?:\s*[a-zA-Z])?$').hasMatch(court)) {
+      return 'Court No. $court'.toUpperCase();
+    }
+    
+    // Default formatting
+    return court.toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+          maxWidth: MediaQuery.of(context).size.width * 0.8,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(15),
+                  topRight: Radius.circular(15),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Select Courts",
+                    style: Tools.H2.copyWith(color: Colors.white),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Court list
+            Flexible(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                child: _isLoading
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              color: Colors.black,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              "Loading courts...",
+                              style: Tools.H3,
+                            ),
+                          ],
+                        ),
+                      )
+                    : _errorMessage != null
+                        ? Center(
+                            child: Text(
+                              "Error loading courts: $_errorMessage",
+                              style: Tools.H3.copyWith(color: Colors.red),
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : _availableCourts == null || _availableCourts!.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  "No courts available for this date",
+                                  style: Tools.H3,
+                                ),
+                              )
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: _availableCourts!.length,
+                                itemBuilder: (context, index) {
+                                  final court = _availableCourts![index];
+                                  final isSelected = _selectedCourts.contains(court);
+                                  
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? Colors.grey[200] : Colors.white,
+                                      border: Border.all(
+                                        color: isSelected ? Colors.black : Colors.grey[300]!,
+                                        width: isSelected ? 2 : 1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: ListTile(
+                                      title: Text(
+                                        _formatCourtDisplay(court),
+                                        style: Tools.H3.copyWith(
+                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                        ),
+                                      ),
+                                      trailing: isSelected
+                                          ? const Icon(Icons.check, color: Colors.black)
+                                          : null,
+                                      onTap: () => _toggleCourtSelection(court),
+                                    ),
+                                  );
+                                },
+                              ),
+              ),
+            ),
+            // Footer with buttons
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(15),
+                  bottomRight: Radius.circular(15),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "${_selectedCourts.length} selected",
+                    style: Tools.H3.copyWith(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: _selectedCourts.isNotEmpty
+                        ? () {
+                            widget.onCourtsSelected(_selectedCourts);
+                            Navigator.of(context).pop();
+                          }
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text("OK"),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
