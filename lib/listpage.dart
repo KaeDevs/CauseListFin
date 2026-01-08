@@ -1,7 +1,10 @@
 import 'package:fincauselist/Tools/adtools.dart';
 import 'package:fincauselist/main.dart';
+import 'package:provider/provider.dart';
+import 'Modules/Subscription/paywall_dialog.dart';
 import 'package:flutter/material.dart';
 import 'ApiStuff.dart'; // Import your API fetching class
+import 'package:fincauselist/Tools/print_service.dart';
 
 class ListPage extends StatefulWidget {
   const ListPage({Key? key}) : super(key: key);
@@ -71,6 +74,15 @@ class _ListPageState extends State<ListPage> {
 
   Future<void> _fetchPaginatedCases(bool advPresent) async {
     if (hasMore && !isLoading) {
+      // Subscription gating: enforce search limit before API calls
+      final app = Provider.of<AppState>(context, listen: false);
+      final can = await app.sub.canSearch();
+      if (!can) {
+        await PaywallDialog.show(context);
+        return;
+      }
+      await app.sub.useSearch();
+
       setState(() {
         isLoading = true;
       });
@@ -239,12 +251,28 @@ class _ListPageState extends State<ListPage> {
     Map<String, Map<String, List<dynamic>>> courts =
         _groupCasesByCourtAndCategory(cases);
 
-    return SafeArea(
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('CAUSE LISTℹ', style: Tools.H3),
-        ),
-        body: Column(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('CAUSE LISTℹ', style: Tools.H3),
+        actions: [
+          // Show print only when court-specific search is active (no pagination)
+          if (AppState().selectedCourts.isNotEmpty || AppState().advName.isNotEmpty)
+            IconButton(
+              tooltip: 'Print as PDF',
+              icon: const Icon(Icons.print),
+              onPressed: () async {
+                if (cases.isEmpty) return;
+                await PrintService.exportCasesAsPdf(
+                  cases: cases,
+                  courtsInfo: courtswithjustice,
+                  title: 'CAUSE LIST',
+                );
+              },
+            ),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
           children: [
             Expanded(
               child: courts.isEmpty
@@ -305,7 +333,7 @@ class _ListPageState extends State<ListPage> {
                                   courts.keys.elementAt(courtIndex);
                               Map<String, List<dynamic>> categories =
                                   courts[courtNumber]!;
-      
+            
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
@@ -363,7 +391,7 @@ class _ListPageState extends State<ListPage> {
                                           child: DataTable(
                                             dataRowMaxHeight: double.infinity,
                                             // headingRowHeight: 0,
-      
+            
                                             columnSpacing: 5,
                                             columns: const [
                                               DataColumn(label: Text('S.No')),
@@ -401,7 +429,12 @@ class _ListPageState extends State<ListPage> {
               color: Colors.grey[300],
               height: 50,
               child: Center(
-                child: RefreshableBannerAdWidget(),
+                child: Consumer<AppState>(
+                  builder: (context, app, _) {
+                    if (app.sub.isPremium) return const SizedBox.shrink();
+                    return RefreshableBannerAdWidget();
+                  },
+                ),
               ),
             )
           ],

@@ -15,7 +15,9 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 import 'Modules/FeedBack/feedback_diaog.dart';
+import 'Services/SubscriptionServices/subscription_service.dart';
 import 'Tools/app_update.dart';
+import 'Modules/Subscription/subscription_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,16 +39,36 @@ void main() {
   checkForUpdate();
   runApp(ChangeNotifierProvider(
       create: (context) => AppState(), child: const MyApp()));
+  
+
   DependencyInjection.init();
 }
 
 class AppState extends ChangeNotifier {
+  final SubscriptionService sub = SubscriptionService();
+
   static final AppState _singleton = AppState._internal();
 
   factory AppState() {
     return _singleton;
   }
-  AppState._internal();
+
+  AppState._internal() {
+    // Listen to subscription changes and propagate to UI
+    sub.addListener(_onSubscriptionChanged);
+    sub.init();
+  }
+
+  void _onSubscriptionChanged() {
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    sub.removeListener(_onSubscriptionChanged);
+    sub.dispose();
+    super.dispose();
+  }
   static const court = ["Madras", "Madurai"];
 
   String mainDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -81,7 +103,10 @@ class AppState extends ChangeNotifier {
   }
 
   void toggleSelected() {
-    AdManager().showInterstitialAd();
+    // Show interstitial only for free users
+    if (!sub.isPremium) {
+      AdManager().showInterstitialAd();
+    }
     if (selected_court == 0) {
       selected_court = 1;
     } else {
@@ -164,9 +189,11 @@ class CenterPage extends StatefulWidget {
   State<StatefulWidget> createState() => _CenterPage();
 }
 
-enum menuitems { about, share, exit, feedBack }
+enum menuitems { about, share, exit, feedBack, subscription }
 
 class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
+
+
   InterstitialAd? _interstitialAd;
   bool _isInterstitialAdReady = false;
   bool isChecked1 = false;
@@ -187,18 +214,18 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-
-    AdManager().loadInterstitialAd();
-
-    // Optional: Show ad once after 10 seconds
-    Timer(Duration(seconds: 10), () {
-      AdManager().showInterstitialAd();
-    });
-
-    // Then show every 4 minutes
-    _adTimer = Timer.periodic(Duration(minutes: 4), (timer) {
-      AdManager().showInterstitialAd();
-    });
+    final isPremium = Provider.of<AppState>(context, listen: false).sub.isPremium;
+    if (!isPremium) {
+      AdManager().loadInterstitialAd();
+      // Optional: Show ad once after 10 seconds
+      Timer(const Duration(seconds: 10), () {
+        AdManager().showInterstitialAd();
+      });
+      // Then show every 4 minutes
+      _adTimer = Timer.periodic(const Duration(minutes: 4), (timer) {
+        AdManager().showInterstitialAd();
+      });
+    }
 
     _controller = TextEditingController();
   }
@@ -247,6 +274,85 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
         }
       });
     }
+  }
+
+  // Show premium dialog
+  void _showPremiumDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.lock,
+                  size: 60,
+                  color: Colors.black54,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "Premium Feature",
+                  style: Tools.H2,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  "Court selection is available only for premium users. Upgrade to premium to access this feature.",
+                  style: Tools.H3.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.normal,
+                    color: Colors.grey[700],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.black,
+                          side: const BorderSide(color: Colors.black54),
+                        ),
+                        child: const Text("Cancel"),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const SubscriptionScreen(),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text("Upgrade"),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   // Show court selection dialog
@@ -393,6 +499,29 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
 // Separate function to create a date picker widget
   Widget _buildDatePicker(
       BuildContext context, DateTime initialDate, List<int> daysOfWeek) {
+    final appState = Provider.of<AppState>(context, listen: false);
+    final isPremium = appState.sub.isPremium;
+    final DateTime today = DateTime.now();
+
+    DateTime _workingDayOffset(DateTime base, int days) {
+      int remaining = days.abs();
+      int step = days >= 0 ? 1 : -1;
+      DateTime d = base;
+      while (remaining > 0) {
+        d = d.add(Duration(days: step));
+        if (d.weekday != DateTime.saturday && d.weekday != DateTime.sunday) {
+          remaining--;
+        }
+      }
+      return d;
+    }
+
+    final DateTime firstDate = isPremium
+        ? _workingDayOffset(today, -7)
+        : today.subtract(const Duration(days: 1));
+    final DateTime lastDate = isPremium
+        ? _workingDayOffset(today, 7)
+        : today.add(const Duration(days: 1));
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -416,17 +545,10 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  "Select Date",
-                  style: Tools.H2.copyWith(color: Colors.white),
-                ),
+                Text("Select Date", style: Tools.H2.copyWith(color: Colors.white)),
                 GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
-                  child: Icon(
-                    Icons.close,
-                    color: Colors.white,
-                    size: 28,
-                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 28),
                 ),
               ],
             ),
@@ -436,28 +558,22 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
             padding: const EdgeInsets.all(15),
             child: Material(
               color: Colors.white,
-
-              textStyle: Tools.H1.copyWith(fontSize: 18),
-              
-
               child: CalendarDatePicker(
                 initialDate: initialDate,
-
-                firstDate: DateTime.now().subtract(Duration(days: 20)),
-                lastDate: DateTime.now().add(Duration(days: 10)),
+                firstDate: firstDate,
+                lastDate: lastDate,
                 selectableDayPredicate: (DateTime dateTime) =>
                     !daysOfWeek.contains(dateTime.weekday),
                 onDateChanged: (pickedDate) {
-                  Navigator.of(context)
-                      .pop(); // Close dialog when a date is selected
+                  Navigator.of(context).pop();
                   if (pickedDate != selectedDate) {
                     Provider.of<AppState>(context, listen: false)
                         .updateMainDate(pickedDate);
                     selectedDate = pickedDate;
                     isdateactive = true;
-                    selectedCourts.clear(); // Clear previous court selections
-                    iscourtselectionactive = true; // Enable court selection
-                    setState(() {}); // Refresh UI
+                    selectedCourts.clear();
+                    iscourtselectionactive = true;
+                    if (mounted) setState(() {});
                   }
                 },
               ),
@@ -498,360 +614,336 @@ class _CenterPage extends State<CenterPage> with TickerProviderStateMixin {
     //   statusBarIconBrightness: Brightness.light, // Light text/icons
     // ));
 
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: Stack(
-            children: [
-              Opacity(
-                opacity: 0.3,
-                child: Container(
-                  decoration: BoxDecoration(
-                    image: DecorationImage(
-                      image: AssetImage(
-                        isbuttonactive
-                            ? isChecked1
-                                ? 'assets/madras.jpg'
-                                : 'assets/madurai.jpg'
-                            : 'assets/madras.jpg',
-                      ),
-                      fit: BoxFit.fitWidth,
-                      alignment: Alignment.bottomCenter,
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Opacity(
+              opacity: 0.3,
+              child: Container(
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage(
+                      isbuttonactive
+                          ? isChecked1
+                              ? 'assets/madras.jpg'
+                              : 'assets/madurai.jpg'
+                          : 'assets/madras.jpg',
                     ),
+                    fit: BoxFit.fitWidth,
+                    alignment: Alignment.bottomCenter,
                   ),
                 ),
               ),
-              Column(
-                children: [
-                  Expanded(
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  "CAUSELIST",
-                                  style: Tools.H1,
-                                ),
-                                PopupMenuButton<menuitems>(
-                                  surfaceTintColor: Colors.white,
-                                  popUpAnimationStyle: AnimationStyle(
-                                      curve: Curves.easeInOut,
-                                      duration: Duration(milliseconds: 300)),
-                                  icon: const Icon(Icons.settings),
-                                  color: Colors.white,
-                                  itemBuilder: (BuildContext context) => [
-                                    const PopupMenuItem(
-                                      value: menuitems.about,
-                                      child: Text("About"),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: menuitems.feedBack,
-                                      child: Text("Feedback"),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: menuitems.share,
-                                      child: Text("Share"),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: menuitems.exit,
-                                      child: Text("Exit"),
-                                    ),
-                                  ],
-                                  onSelected: (value) {
-                                    switch (value) {
-                                      case menuitems.about:
-                                        Navigator.of(context).push(
-                                            MaterialPageRoute(
-                                                builder: (context) =>
-                                                    const AboutPage()));
-                                        break;
-                                      case menuitems.share:
-                                        Share.share(
-                                            "Checkout this app! https://play.google.com/store/apps/details?id=mhc.file.mhcdb&hl=en_IN",
-                                            subject: "Look what I found!");
-                                        break;
-                                      case menuitems.feedBack:
-                                        FeedbackDialog.show(context);
-                                        break;
-                                      case menuitems.exit:
-                                        SystemNavigator.pop();
-                                        break;
-                                    }
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(0, 5, 0, 0),
-                            child: Container(
-                              width: double.maxFinite,
-                              color: Colors.black,
-                              child: Padding(
-                                padding: const EdgeInsets.all(5.0),
-                                child: Center(
-                                  child: Text(
-                                    "Madras High Court",
-                                    style:
-                                        Tools.H2.copyWith(color: Colors.white),
+            ),
+            Column(
+              children: [
+                Expanded(
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                "CAUSELIST",
+                                style: Tools.H1,
+                              ),
+                              PopupMenuButton<menuitems>(
+                                surfaceTintColor: Colors.white,
+                                popUpAnimationStyle: AnimationStyle(
+                                    curve: Curves.easeInOut,
+                                    duration: Duration(milliseconds: 300)),
+                                icon: const Icon(Icons.settings),
+                                color: Colors.white,
+                                itemBuilder: (BuildContext context) => [
+                                  const PopupMenuItem(
+                                    value: menuitems.about,
+                                    child: Text("About"),
                                   ),
+                                  const PopupMenuItem(
+                                    value: menuitems.feedBack,
+                                    child: Text("Feedback"),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: menuitems.subscription,
+                                    child: Text("Subscription"),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: menuitems.share,
+                                    child: Text("Share"),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: menuitems.exit,
+                                    child: Text("Exit"),
+                                  ),
+                                ],
+                                onSelected: (value) {
+                                  switch (value) {
+                                    case menuitems.about:
+                                      Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const AboutPage()));
+                                      break;
+                                    case menuitems.share:
+                                      Share.share(
+                                          "Checkout this app! https://play.google.com/store/apps/details?id=mhc.file.mhcdb&hl=en_IN",
+                                          subject: "Look what I found!");
+                                      break;
+                                    case menuitems.feedBack:
+                                      FeedbackDialog.show(context);
+                                      break;
+                                    case menuitems.subscription:
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (context) => const SubscriptionScreen(),
+                                        ),
+                                      );
+                                      break;
+                                    case menuitems.exit:
+                                      SystemNavigator.pop();
+                                      break;
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 5, 0, 0),
+                          child: Container(
+                            width: double.maxFinite,
+                            color: Colors.black,
+                            child: Padding(
+                              padding: const EdgeInsets.all(5.0),
+                              child: Center(
+                                child: Text(
+                                  "Madras High Court",
+                                  style:
+                                      Tools.H2.copyWith(color: Colors.white),
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 15),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
-                            child: Column(
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: CheckboxListTile(
-                                        title: const Text(
-                                          "Madras",
-                                          style: Tools.H3,
-                                        ),
-                                        value: isChecked1,
-                                        checkColor: Colors.black,
-                                        activeColor: Colors.transparent,
-                                        onChanged: _onChanged1,
-                                        controlAffinity:
-                                            ListTileControlAffinity.leading,
+                        ),
+                        const SizedBox(height: 15),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: CheckboxListTile(
+                                      title: const Text(
+                                        "Madras",
+                                        style: Tools.H3,
                                       ),
+                                      value: isChecked1,
+                                      checkColor: Colors.black,
+                                      activeColor: Colors.transparent,
+                                      onChanged: _onChanged1,
+                                      controlAffinity:
+                                          ListTileControlAffinity.leading,
                                     ),
-                                    Expanded(
-                                      child: CheckboxListTile(
-                                        checkColor: Colors.black,
-                                        activeColor: Colors.transparent,
-                                        title: const Text(
-                                          "Madurai",
-                                          style: Tools.H3,
-                                        ),
-                                        value: isChecked2,
-                                        onChanged: _onChanged2,
-                                        controlAffinity:
-                                            ListTileControlAffinity.leading,
+                                  ),
+                                  Expanded(
+                                    child: CheckboxListTile(
+                                      checkColor: Colors.black,
+                                      activeColor: Colors.transparent,
+                                      title: const Text(
+                                        "Madurai",
+                                        style: Tools.H3,
                                       ),
+                                      value: isChecked2,
+                                      onChanged: _onChanged2,
+                                      controlAffinity:
+                                          ListTileControlAffinity.leading,
                                     ),
-                                  ],
-                                ),
-                                const SizedBox(height: 15),
-                                AnimatedOpacity(
-                                  curve: Curves.ease,
-                                  opacity: isbuttonactive ? 1.0 : 0.0,
-                                  duration: const Duration(milliseconds: 600),
-                                  child: Padding(
-                                    padding:
-                                        const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceAround,
-                                      children: [
-                                        Text(
-                                          "Select Date:",
-                                          style: TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold,
-                                            color: isbuttonactive
-                                                ? Colors.black
-                                                : const Color.fromARGB(
-                                                    255, 192, 192, 192),
-                                            fontFamily: 'H1',
-                                          ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 15),
+                              AnimatedOpacity(
+                                curve: Curves.ease,
+                                opacity: isbuttonactive ? 1.0 : 0.0,
+                                duration: const Duration(milliseconds: 600),
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                                  child: _buildFormRow(
+                                    label: "Select Date:",
+                                    enabled: isbuttonactive,
+                                    control: SizedBox(
+                                      height: 44,
+                                      child: OutlinedButton.icon(
+                                        onPressed: isbuttonactive ? () => _selectDate(context) : null,
+                                        icon: const Icon(Icons.calendar_today, size: 18),
+                                        label: Text(
+                                          selectedDate != null
+                                              ? DateFormat('dd/MM/yyyy').format(selectedDate!)
+                                              : "Choose Date",
+                                          style: Tools.H3.copyWith(fontSize: 16, fontWeight: FontWeight.w700),
                                         ),
-                                        TextButton(
-                                          onPressed: isbuttonactive
-                                              ? () => _selectDate(context)
-                                              : null,
-                                          style: TextButton.styleFrom(
-                                            foregroundColor: isbuttonactive
-                                                ? Colors.black
-                                                : Colors.grey[600],
-                                            backgroundColor: isbuttonactive
-                                                ? Colors.grey[200]
-                                                : Colors.grey[300],
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 17, vertical: 10),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(5),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            selectedDate != null
-                                                ? DateFormat('dd/MM/yyyy')
-                                                    .format(selectedDate!)
-                                                : "Choose Date",
-                                            style: TextStyle(
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.bold,
-                                              color: isbuttonactive
-                                                  ? Colors.black
-                                                  : const Color.fromARGB(
-                                                      255, 192, 192, 192),
-                                              fontFamily: 'H1',
-                                            ),
-                                          ),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.black,
+                                          side: const BorderSide(color: Colors.black54),
+                                          alignment: Alignment.centerLeft,
                                         ),
-                                      ],
+                                      ),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 15),
-                                // Search by Court button
-                                AnimatedOpacity(
-                                  curve: Curves.ease,
-                                  opacity: iscourtselectionactive ? 1.0 : 0.0,
-                                  duration: const Duration(milliseconds: 500),
-                                  child: iscourtselectionactive
-                                      ? Padding(
-                                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                                          child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                            children: [
-                                              Text(
-                                                "Court👑:",
-                                                style: TextStyle(
-                                                  fontSize: 20,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: iscourtselectionactive ? Colors.black : Colors.grey[600],
-                                                  fontFamily: 'H1',
-                                                ),
-                                              ),
-                                              Spacer(),
-                                              TextButton(
-                                                onPressed: iscourtselectionactive ? _showCourtSelectionDialog : null,
-                                                style: TextButton.styleFrom(
-                                                  foregroundColor: iscourtselectionactive ? Colors.black : Colors.grey[600],
-                                                  backgroundColor: iscourtselectionactive ? Colors.grey[200] : Colors.grey[300],
-                                                  padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(5),
+                              ),
+                              const SizedBox(height: 15),
+                              // Search by Court button
+                              AnimatedOpacity(
+                                curve: Curves.ease,
+                                opacity: iscourtselectionactive ? 1.0 : 0.0,
+                                duration: const Duration(milliseconds: 500),
+                                child: iscourtselectionactive
+                                    ? Padding(
+                                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                                        child: _buildFormRow(
+                                          label: "Court👑:",
+                                          enabled: iscourtselectionactive,
+                                          control: SizedBox(
+                                            height: 44,
+                                            child: Consumer<AppState>(
+                                              builder: (context, app, _) {
+                                                final bool locked = !app.sub.isPremium;
+                                                final String labelText = selectedCourts.isEmpty
+                                                    ? "All Courts"
+                                                    : "${selectedCourts.length} Court${selectedCourts.length > 1 ? 's' : ''}";
+                                                return OutlinedButton(
+                                                  onPressed: locked ? _showPremiumDialog : _showCourtSelectionDialog,
+                                                  style: OutlinedButton.styleFrom(
+                                                    foregroundColor: Colors.black,
+                                                    side: const BorderSide(color: Colors.black54),
+                                                    alignment: Alignment.centerLeft,
                                                   ),
-                                                ),
-                                                child: Text(
-                                                  selectedCourts.isEmpty
-                                                      ? "All Courts"
-                                                      : "${selectedCourts.length} Court${selectedCourts.length > 1 ? 's' : ''}",
-                                                  style: TextStyle(
-                                                    fontSize: 20,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: iscourtselectionactive ? Colors.black : Colors.grey[600],
-                                                    fontFamily: 'H1',
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        )
-                                      : Container(),
-                                ),
-                                const SizedBox(height: 20),
-                                AnimatedOpacity(
-                                  curve: Curves.ease,
-                                  opacity: isdateactive ? 1.0 : 0.0,
-                                  duration: const Duration(milliseconds: 500),
-                                  child: isdateactive
-                                      ? Padding(
-                                          padding: const EdgeInsets.fromLTRB(
-                                              30, 0, 20, 0),
-                                          child: Column(
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Flexible(
-                                                    flex: 1,
-                                                    child: Align(
-                                                      alignment:
-                                                          Alignment.centerLeft,
-                                                      child: Text(
-                                                        "Advocate:",
-                                                        style: TextStyle(
-                                                          fontSize: 20,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          color: isdateactive
-                                                              ? Colors.black
-                                                              : const Color
-                                                                  .fromARGB(
-                                                                  255,
-                                                                  192,
-                                                                  192,
-                                                                  192),
-                                                          fontFamily: 'H1',
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      if (locked) ...[
+                                                        const Icon(Icons.lock, size: 16, color: Colors.black54),
+                                                        const SizedBox(width: 6),
+                                                      ],
+                                                      Flexible(
+                                                        child: Text(
+                                                          labelText,
+                                                          style: Tools.H3.copyWith(
+                                                            fontSize: 16,
+                                                            fontWeight: FontWeight.w700,
+                                                            color: locked ? Colors.black54 : Colors.black,
+                                                          ),
+                                                          overflow: TextOverflow.ellipsis,
                                                         ),
                                                       ),
-                                                    ),
+                                                    ],
                                                   ),
-                                                  Flexible(
-                                                    flex: 1,
-                                                    child: Align(
-                                                      alignment:
-                                                          Alignment.centerLeft,
-                                                      child: TextFormField(
-                                                        controller: _controller,
-                                                        onChanged:
-                                                            (String value) {
-                                                          final appstate =
-                                                              Provider.of<
-                                                                      AppState>(
-                                                                  context,
-                                                                  listen:
-                                                                      false);
-                                                          appstate
-                                                              .changeAdvName(
-                                                                  value);
-                                                        },
-                                                        decoration:
-                                                            const InputDecoration(
-                                                          hintText:
-                                                              "Advocate Name",
-                                                          border:
-                                                              OutlineInputBorder(),
-                                                          fillColor:
-                                                              Colors.white,
-                                                          filled: true,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              Row(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment.center,
-                                                children: [
-                                                  Padding(
-                                                    padding:
-                                                        EdgeInsets.all(20.0),
-                                                    child: CustomButton(selectedCourts: selectedCourts),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
+                                                );
+                                              },
+                                            ),
                                           ),
-                                        )
-                                      : Container(),
-                                ),
-                              ],
-                            ),
+                                        ),
+                                      )
+                                    : Container(),
+                              ),
+                              const SizedBox(height: 20),
+                              AnimatedOpacity(
+                                curve: Curves.ease,
+                                opacity: isdateactive ? 1.0 : 0.0,
+                                duration: const Duration(milliseconds: 500),
+                                child: isdateactive
+                                    ? Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                            30, 0, 20, 0),
+                                        child: Column(
+                                          children: [
+                                            _buildFormRow(
+                                              label: "Advocate:",
+                                              enabled: isdateactive,
+                                              control: TextFormField(
+                                                controller: _controller,
+                                                onChanged: (String value) {
+                                                  final appstate = Provider.of<AppState>(context, listen: false);
+                                                  appstate.changeAdvName(value);
+                                                },
+                                                decoration: const InputDecoration(
+                                                  hintText: "Advocate Name",
+                                                  border: OutlineInputBorder(),
+                                                  fillColor: Colors.white,
+                                                  filled: true,
+                                                  prefixIcon: Icon(Icons.person_outline),
+                                                ),
+                                              ),
+                                            ),
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Padding(
+                                                  padding:
+                                                      EdgeInsets.all(20.0),
+                                                  child: CustomButton(selectedCourts: selectedCourts),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : Container(),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                  RefreshableBannerAdWidget(),
-                ],
-              ),
-            ],
-          ),
+                ),
+                Consumer<AppState>(
+                  builder: (context, app, _) {
+                    if (app.sub.isPremium) return const SizedBox.shrink();
+                    return RefreshableBannerAdWidget();
+                  },
+                ),
+              ],
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  // Small helper to keep label/control aligned consistently for Date, Court and Advocate rows
+  Widget _buildFormRow({
+    required String label,
+    required Widget control,
+    bool enabled = true,
+  }) {
+    final labelColor = enabled
+        ? Colors.black
+        : const Color.fromARGB(255, 192, 192, 192);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(
+              label,
+              style: Tools.H3.copyWith(color: labelColor),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: control),
+        ],
       ),
     );
   }
@@ -880,7 +972,9 @@ class _CustomButtonState extends State<CustomButton> {
 
           // Update AppState with selected courts
           final appState = Provider.of<AppState>(context, listen: false);
-          appState.updateSelectedCourts(widget.selectedCourts);
+          final bool isPremium = appState.sub.isPremium;
+          final List<String> courtsToUse = isPremium ? widget.selectedCourts : [];
+          appState.updateSelectedCourts(courtsToUse);
 
           Fluttertoast.showToast(
             msg: 'Cause List Loading!',
@@ -1253,21 +1347,41 @@ class _CourtSelectionDialogState extends State<_CourtSelectionDialog> {
                       color: Colors.grey[600],
                     ),
                   ),
-                  ElevatedButton(
-                    onPressed: _selectedCourts.isNotEmpty
-                        ? () {
-                            widget.onCourtsSelected(_selectedCourts);
-                            Navigator.of(context).pop();
-                          }
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  Row(
+                    children: [
+                      OutlinedButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedCourts.clear();
+                          });
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.black,
+                          side: const BorderSide(color: Colors.black54),
+                        ),
+                        child: const Text("Clear"),
                       ),
-                    ),
-                    child: const Text("OK"),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: _selectedCourts.isNotEmpty
+                            ? () {
+                                widget.onCourtsSelected(_selectedCourts);
+                                Navigator.of(context).pop();
+                              }
+                            : () {
+                                widget.onCourtsSelected(_selectedCourts);
+                                Navigator.of(context).pop();
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text("OK"),
+                      ),
+                    ],
                   ),
                 ],
               ),
